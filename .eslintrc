@@ -1,0 +1,17 @@
+{
+  "extends": "airbnb-base",
+  "env": {
+    "node": true,
+    "es6": true
+  },
+  "rules": {
+    "no-underscore-dangle": "off",
+    "no-param-reassign": "off",
+    "class-methods-use-this": "off",
+    "max-len": "warn",
+    "no-console": "warn",
+    "prefer-destructuring": "off",
+    "no-plusplus": "off",
+    "no-continue": "off"
+  }
+}
