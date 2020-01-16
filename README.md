@@ -27,7 +27,7 @@ MyEntity$foo#0000001
 
 ### Entity
 
-Base type, use to store item
+Base type, used to store item
 
 - `pk` : `NAME`:`ID`
 - `sk` : `NAME`
@@ -35,7 +35,7 @@ Base type, use to store item
 
 ### Entity Indexed Field
 
-Use to index field
+Used to index field
 
 - `pk` : `NAME`:`ID`
 - `sk` : $`FIELD`
