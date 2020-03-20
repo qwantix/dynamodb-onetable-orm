@@ -17,14 +17,12 @@ const defaultSeparators = {
   index: '$',
   relation: '@',
   // composite: '+',
-
-  ssFieldStart: '║',
-  ssValueStart: '├',
-  ssValueEnd: '┤',
 };
 
 const defaultConfig = {
   versionSize: 6,
+  indexName: 'gsi-index',
+  continuationTokenEncryptionKey: '',
 };
 
 
@@ -83,6 +81,11 @@ class Table {
 
   async batchWrite(writes) {
     const it = this.mapper.batchWrite(writes);
+    await iterateAwait(it, () => {});
+  }
+
+  async batchDelete(deletion) {
+    const it = this.mapper.batchDelete(deletion);
     await iterateAwait(it, () => {});
   }
 

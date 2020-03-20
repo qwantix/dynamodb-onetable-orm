@@ -5,25 +5,24 @@ const {
 } = require('@aws/dynamodb-data-mapper');
 
 const {
-  FunctionExpression,
-  AttributePath,
-} = require('@aws/dynamodb-expressions');
-
-const {
   unmarshallItem,
 } = require('@aws/dynamodb-data-marshaller');
 
 const Row = require('./row');
 const Relation = require('./relation');
-const ChangeWatcher = require('./watcher');
+const {
+  newIndex,
+  getIndexCls,
+  getIndexParams,
+  Index,
+} = require('./entity-index');
+
+const State = require('./state');
+const Query = require('./query');
 
 const {
   genId,
-  normalizeStr,
-  iterateAwait,
 } = require('./utils');
-
-const classCache = {};
 
 
 class Entity extends Row {
@@ -51,6 +50,28 @@ class Entity extends Row {
   static get $maxVersions() {
     return 0; // Not versionned by default
   }
+
+  /**
+   * Returns object of indexes
+   */
+  static get $indexes() {
+    return {
+      // myIndex: {
+      //   include: ['fields','names'], // Include fields
+      //   data: 'fieldName' or function,
+      //   search: Boolean || ['list', 'fields'],
+      //   relations: [Relation]
+      // },
+    };
+  }
+
+  /**
+   * Return object of relations
+   */
+  static get $relations() {
+    return {};
+  }
+
 
   /**
    * Ensure prefix exists
@@ -95,77 +116,95 @@ class Entity extends Row {
 
     let item;
     try {
-      // Load all items matching pk
+      // Load all items matching the id
       const { Items } = await this.$table.query({
         TableName: this.prototype[DynamoDbTable],
-        KeyConditionExpression: 'pk = :pk',
+        KeyConditionExpression: '#id = :id',
+        ExpressionAttributeNames: {
+          '#id': '$id',
+        },
         ExpressionAttributeValues: {
-          ':pk': {
+          ':id': {
             S: id,
           },
         },
       });
 
-
+      const indexes = [];
       const relations = [];
-      const relationsSk = [];
       const versions = [];
+
       for (let i = 0; i < Items.length; i++) {
         const v = Items[i];
-        const sk = v.sk.S;
-        const skInfo = this.$table.parseKey(sk);
+        const $kt = v.$kt.S;
+        const $ktInfo = this.$table.parseKey($kt);
         // If is the item
-        if (sk === this.$prefix) {
+        if ($kt === this.$prefix) {
           const sch = this.prototype[DynamoDbSchema];
           item = unmarshallItem(sch, v, this);
-          item._changes.set('item', item, true);
-          // eslint-disable-next-line no-loop-func
-          Object.keys(sch).forEach((k) => {
-            if (sch[k].indexed) {
-              item._changes.set(`$${k}`, item[k], true);
-            }
-          });
         // If is the indexed field
-        } else if (skInfo.index && !skInfo.relation) {
+        } else if ($ktInfo.index && !$ktInfo.relation) {
+          indexes.push({ name: $ktInfo.index, value: v });
           // Ignore
         // Otherwise, is a relation
-        } else if (skInfo.relation) {
-          const name = skInfo.index;
+        } else if ($ktInfo.relation) {
+          const name = $ktInfo.index;
           const rel = this.$relations[name];
           const Cls = rel.type;
-          relationsSk.push(sk);
           if (Cls.prototype instanceof Relation) {
+            const r = unmarshallItem(Cls.prototype[DynamoDbSchema], v, Cls);
+            r.$name = name;
             relations.push(
-              { name, item: unmarshallItem(Cls.prototype[DynamoDbSchema], v, Cls) },
+              {
+                name, item: r, row: r, $kt,
+              },
             );
           } else {
             const row = unmarshallItem(Relation.prototype[DynamoDbSchema], v, Relation);
-            const { relation } = this.$table.parseKey(row.sk);
+            const { relation } = this.$table.parseKey(row.$kt);
+            const r = new Cls(relation);
+            r.$name = name;
             relations.push(
               {
-                name,
-                item: new Cls(relation),
+                name, item: r, row, $kt,
               },
             );
           }
-        } else if (skInfo.version && !skInfo.index && !skInfo.relation) {
+        // If version
+        } else if ($ktInfo.version && !$ktInfo.index && !$ktInfo.relation) {
           const sch = this.prototype[DynamoDbSchema];
           const versionItem = unmarshallItem(sch, v, this);
-          versions.push(versionItem);
+          versions.push({
+            v: $ktInfo.version,
+            item: versionItem,
+          });
         }
       }
       if (!item) {
         return null;
       }
-      item._invalidateRl();
+      item._state.initEntity(item);
+
+      for (let i = 0; i < indexes.length; i++) {
+        const { name, value } = indexes[i];
+        const Cls = getIndexCls(item.constructor, name);
+        const idxItem = unmarshallItem(Cls.prototype[DynamoDbSchema], value, Cls);
+        idxItem.$name = name;
+        item._state.set('idx', idxItem.$kt, idxItem, true);
+      }
       for (let i = 0; i < relations.length; i++) {
         const rel = relations[i];
-        item._changes.set(`:${rel.name}:${rel.item.pk}`, rel.item, true);
+        item._state.set('rel', rel.$kt, rel.row, true);
       }
       item._relations = relations;
-      // eslint-disable-next-line no-nested-ternary
-      item._versions = versions.sort((a, b) => (a.v === b.v ? 0 : (a.v > b.v ? 1 : -1)));
-      item._changes.set('relationsSk', relationsSk, true);
+      // Sort by asc
+      item._versions = versions.sort((a, b) =>
+        // eslint-disable-next-line no-nested-ternary, implicit-arrow-linebreak
+        (a.v === b.v ? 0 : (a.v > b.v ? 1 : -1)))
+        .map(v => v.item);
+      item._v = versions.reduce((out, { v }) => Math.max(out, v), 0); // Get max version
+      item._state.set('rel', 'keys', relations.map(r => r.$kt), true);
+      // item._state.print('ON GET');
     } catch (e) {
       if (e.name === 'ItemNotFoundException') {
         return null;
@@ -175,87 +214,56 @@ class Entity extends Row {
     return item;
   }
 
-  //
-  static async find(opts) {
-    opts = opts || {};
-    const revert = (!!opts.revert) || false;
-    const relatedTo = opts.relatedTo || [];
-    const search = opts.search;
-    const limit = opts.limit || 100;
-    const page = opts.page || 1;
-    const pageSize = opts.pageSize || limit;
-    const dataCondition = opts.dataCondition;
-    // Build filter
-    let filter = opts.filter;
 
-    if (!filter) {
-      const conditions = [];
-      if (relatedTo.length) {
-        conditions.push(...relatedTo.map(r => new FunctionExpression('contains', new AttributePath('rl'), r)));
-      }
-      if (typeof search === 'string') {
-        // Search on all fields
-        normalizeStr(search).split(/\s+/).forEach((s) => {
-          conditions.push(new FunctionExpression('contains', new AttributePath('ss'), `╠${s}`));
-        });
-      }
-      filter = conditions.length ? {
-        type: 'And',
-        conditions,
-      } : null;
-    }
+  static async delete(id) {
+    this.setup();
 
-    const keyCondition = opts.keyCondition || {
-      sk: this.$name,
-    };
-
-    if (dataCondition) {
-      keyCondition.dt = dataCondition;
-    }
-
-    // Request on gsi
-    const it = await this.$table.query(this, keyCondition, {
-      indexName: 'gsi-search',
-      pageSize,
-      // limit,
-      projection: ['pk', 'sk'],
-      scanIndexForward: !revert,
-      filter,
-      ...(opts.opts || {}),
+    id = this.ensurePrefix(id);
+    // Force refetch all key before delete
+    const {
+      Items,
+    } = await this.$table.query({
+      TableName: this.prototype[DynamoDbTable],
+      KeyConditionExpression: '#id = :id',
+      ExpressionAttributeNames: {
+        '#id': '$id',
+        '#kt': '$kt',
+      },
+      ExpressionAttributeValues: {
+        ':id': {
+          S: id,
+        },
+      },
+      ProjectionExpression: '#id,#kt',
     });
 
-    for (let i = 0; i < pageSize * (page - 1); i++) {
-      const item = await it.next(); // Pass pages
-      if (item.done) break;
-    }
+    await this.$table.batchDelete(Items.map(itm => Object.assign(new this(), {
+      $id: itm.$id.S,
+      $kt: itm.$kt.S,
+    })));
+  }
 
-    // Fetch keys
-    const keys = [];
-    for (let i = 0; i < Math.min(pageSize, limit); i++) {
-      const item = await it.next();
-      if (item.done) break;
-      keys.push(new this(item.value.pk));
-    }
+  /**
+   * Create new query
+   * @returns Query
+   */
+  static query() {
+    const q = new Query();
+    q._entity = this;
+    return q;
+  }
 
-    // Get Items
-    const results = this.$table.batchGet(keys);
-    const items = [];
-    await iterateAwait(results, (item) => {
-      items.push(item);
-    });
-    // Force re-sort because batchGet do not preserve order
-    // eslint-disable-next-line no-nested-ternary
-    return items.sort((a, b) => (revert ? -1 : 1) * (a.dt === b.dt ? 0 : a.dt > b.dt ? 1 : -1));
+  static getIndexCls(name) {
+    return getIndexCls(this, name);
   }
 
   static setup() {
     if (!this._setup) {
       // Addding relation properties
-      const keys = Object.keys(this.$relations);
+      const keys = Object.keys(this.$relations || {});
       for (let i = 0; i < keys.length; i++) {
         const name = keys[i];
         const def = { ...this.$relations[name] };
-
         Object.defineProperties(this.prototype, {
           [name]: {
             enumerable: true,
@@ -299,121 +307,84 @@ class Entity extends Row {
 
   constructor(data) {
     super();
-    this._sk = this.$table.formatKey({
+    this.constructor.setup();
+    this._$kt = this.$table.formatKey({
       entity: this.$prefix,
     });
-    this._pk = null;
-    this._searchable = true;
-    this._changes = new ChangeWatcher();
+    this._$id = null;
+    this._state = new State();
+    this._state.initEntity(this);
     this._relations = [];
+    this._pendingRelationsKeys = [];
+    this._versions = [];
+    this._v = 0;
+
+    this._writes = [];
+
     this.setData(data);
-    this._changes.set('item', this);
     this.resetWrites();
   }
 
-  set pk(value) {
-    this._pk = this.constructor.ensurePrefix(value);
+  set $id(value) {
+    this._$id = this.constructor.ensurePrefix(value);
   }
 
-  get pk() {
-    return this._pk;
+  get $id() {
+    return this._$id;
   }
 
-  set sk(value) {
-    this._sk = value;
+  set $kt(value) {
+    this._$kt = value;
   }
 
-  get sk() {
-    return this._sk;
+  get $kt() {
+    return this._$kt;
   }
 
   get id() {
-    return this.constructor.removePrefix(this.pk);
+    return this.constructor.removePrefix(this.$id);
   }
 
   get $data() {
     return this.id;
   }
 
-  set dt(value) {
-    this._dt = value;
+  set $sk(value) {
+    this._$sk = value;
   }
 
-  get dt() {
-    return this._dt || this.$data;
-  }
-
-  set ss(_value) {
-    // this
-  }
-
-  get rl() {
-    if (!this._rl) {
-      const rl = new Set();
-      const t = this.$table;
-      for (let i = 0; i < this._relations.length; i++) {
-        const r = this._relations[i];
-        rl.add(t.formatKey({
-          index: r.name,
-          relation: r.item.pk,
-        }));
-      }
-      this._rl = rl;
-    }
-    return this._rl;
-  }
-
-  set rl(value) {
-    this._rl = null;
-  }
-
-  /**
-   * Search string
-   */
-  get ss() {
-    if (!this._searchable) return undefined;
-    const C = this.constructor;
-    const {
-      ssFieldStart, ssValueStart, ssValueEnd,
-    } = C.$table.separators;
-    const keys = Object.keys(C.$schema);
-    let ss = '';
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      if (C.$schema[k].searchable) {
-        const ser = typeof C.$schema[k].searchable === 'function'
-          ? C.$schema[k].searchable
-          : v => normalizeStr(v);
-        ss += ssFieldStart + k + ssValueStart + ser(this[k], k) + ssValueEnd;
-      }
-    }
-    return ss || undefined;
+  get $sk() {
+    return this._$sk || this.$data;
   }
 
   setData(data) {
     if (typeof data === 'string') {
-      this.pk = data;
-    } else if (data) {
-      this.pk = data.pk || data.id;
+      this.$id = data;
+    } else if (typeof data === 'object') {
+      this.$id = data.$id || data.id;
       Object.keys(this.constructor.$schema)
         .forEach((k) => {
           this[k] = data[k];
+        });
+      Object.keys(this.constructor.$relations)
+        .forEach((k) => {
+          if (data[k]) {
+            this[k] = data[k];
+          }
         });
     }
   }
 
   async save() {
-    this.constructor.setup();
-    if (!this.pk) {
-      this.pk = this.constructor.$generateID();
+    if (!this.$id) {
+      this.$id = this.constructor.$generateID();
     }
-    this.sk = this.constructor.$prefix;
+    this.$kt = this.constructor.$prefix;
     this.writeVersion();
     this.writeIndexes();
     this.writeRelations();
     this.writeItem();
-    await this.commit();
-    return this;
+    return this.commit();
   }
 
   _ensureRelation(inst) {
@@ -423,24 +394,18 @@ class Entity extends Row {
     throw new Error('Invalid relation');
   }
 
-  _invalidateRl() {
-    this._rl = null;
-  }
-
   addRelation(name, inst) {
     const rel = this._ensureRelation(inst);
     this._relations = this._relations
-      .filter(({ item }) => item.pk !== rel.pk) // Remove relation
+      .filter(({ item }) => item.$id !== rel.$id) // Remove relation
       .concat([{ name, item: rel }]); // Add an return new relation
-    this._invalidateRl();
   }
 
   removeRelation(name, inst) {
     const rel = this._ensureRelation(inst);
     this._relations = this._relations
-      .filter(({ item }) => item.pk !== rel.pk); // Remove relation
-    this._changes.set(`:${name}:${rel.pk}`, null);
-    this._invalidateRl();
+      .filter(({ item }) => item.$id !== rel.$id); // Remove relation
+    this._state.set('rel', rel.$kt, null); // TODO check real $kt value.... may be wrong
   }
 
   setRelations(name, relations) {
@@ -448,11 +413,8 @@ class Entity extends Row {
       return;
     }
     this._relations = this._relations
-      .filter(({
-        item,
-      }) => item.name === name) // Remove all relations
+      .filter(item => item.name !== name) // Remove all relations of this typs
       .concat(relations.map(r => ({ name, item: this._ensureRelation(r) })));
-    this._invalidateRl();
   }
 
   getRelations(name) {
@@ -468,7 +430,7 @@ class Entity extends Row {
 
   getRelation(name, id) {
     if (id) {
-      this.getRelations(name).find(r => r.pk === id);
+      this.getRelations(name).find(r => r.$id === id);
     }
     return this.getRelations(name)[0] || null;
   }
@@ -478,115 +440,160 @@ class Entity extends Row {
   }
 
   writeVersion() {
-    if (!this._changes.changed('item', this)) {
+    if (!this._state.changed('entity')) {
       return;
     }
-    this.v = (this.v || 0) + 1;
+    this._v = (this._v || 0) + 1;
     const C = this.constructor;
     const maxVersions = C.$maxVersions;
     if (maxVersions === 0) {
       return; // Ignore
     }
     const t = new this.constructor();
-    t.pk = this.pk;
-    t.sk = this.$table.formatKey({
+    t.$id = this.$id;
+    t.$kt = this.$table.formatKey({
       entity: this.$prefix,
-      version: this.v,
+      version: this._v,
     });
-
-    t.v = this.v;
-    t._searchable = false; // Disable search index
-    t._rl = this.rl; // Add relation map
     const keys = Object.keys(C.$schema);
+    let changed = false;
     for (let i = 0; i < keys.length; i++) {
       const k = keys[i];
       if (C.$schema[k].versioned) {
+        changed = changed || this._state.changed('entity', k, this[k]);
         t[k] = this[k];
       }
     }
+
+    if (!changed) return; // Not changes detected
+
     this._writes.push(['put', t]);
     if (maxVersions >= 1) {
       // Remove versions
-      while (this._versions.length > maxVersions) {
+      while (this._versions.length >= maxVersions) {
         this._writes.push(['delete', this._versions.shift()]);
       }
     }
   }
 
   writeItem() {
-    if (!this._changes.changed('item', this)) {
+    if (!this._state.changed('entity')) {
       return;
     }
     this._writes.push(['put', this]);
   }
 
   writeIndexes() {
-    const sch = this.constructor.$schema;
-    const createIndex = (name, value) => {
-      const idx = this._newIndex(name);
-      idx.pk = this.pk;
-      idx.dt = value;
+    const indexes = this.constructor.$indexes;
+    const createIndex = (name) => {
+      const {
+        include,
+        data,
+        relations,
+      } = getIndexParams(this.constructor, name);
+
+      const idx = newIndex(this.constructor, name);
+      idx.$id = this.$id;
+      // Set data
+      if (data instanceof Function) {
+        idx.$sk = String(data(this));
+      } else if (typeof data === 'string') {
+        idx.$sk = this[data];
+      } else {
+        idx.$sk = new Date().toISOString();
+      }
+
+      // Include fields
+      //    includes: []
+      if (include instanceof Array) {
+        include.forEach((f) => {
+          idx.$sf[f] = this[f];
+        });
+      }
+
+      // Include relations
+      //   relations: ['name']
+      const rels = [];
+      if (relations === true) {
+        rels.push(...Object.keys(this.constructor.$relations || {}));
+      } else if (relations instanceof Array) {
+        rels.push(...relations);
+      }
+
+      if (rels.length > 0) {
+        const sr = new Set(rels);
+        idx.$rl = new Set(this._relations
+          .filter(r => sr.has(r.name))
+          .map(r => this.$table.formatKey({
+            entity: this.$prefix,
+            index: r.name,
+            relation: r.item.$id,
+          })));
+      }
+
+      // Set $kt
+      idx.$kt = this.$table.formatKey({
+        entity: this.$prefix,
+        index: name,
+      });
       return idx;
     };
 
-    Object.keys(sch).forEach((k) => {
-      if (sch[k].indexed && this._changes.changed(`$${k}`, this[k])) {
-        this._changes.setDirty(`$${k}`);
-        this._writes.push(['put', createIndex(k, this[k])]);
+    Object.keys(indexes).forEach((k) => {
+      const idx = createIndex(k);
+      if (this._state.changed('idx', idx.$kt, idx)) {
+        this._writes.push(['put', idx]);
       }
     });
   }
 
   writeRelations() {
-    const relToDelete = new Set(this._changes.get('relationsSk'));
+    const relToDelete = new Set(this._state.get('rel', 'keys'));
+    this._pendingRelationsKeys = [];
     for (let i = 0; i < this._relations.length; i++) {
       const { name, item } = this._relations[i];
       const def = this.constructor.$relations[name];
-      const sk = this.$table.formatKey({
+      const $kt = this.$table.formatKey({
         entity: this.$prefix,
         index: name,
-        relation: item.pk,
+        relation: item.$id,
       });
-      relToDelete.delete(sk);
+      relToDelete.delete($kt);
+      this._pendingRelationsKeys.push($kt);
       // Check if inclued field changed...
-      // XXX Try to find a more elegant solution because isDirty depends on writeIndex
-      const include = (def.include || [])
-        .concat(def.searchable ? ['ss'] : []); // Append search field if needed
+      const include = (def.include || []);
+      const includeChanged = !!include.find(field => this._state.changed('entity', field));
 
-      const includeChanged = !!include.find(field => this._changes.isDirty(`$${field}`));
+      let rel = item;
+      if (!(rel instanceof Relation)) {
+        rel = new Relation();
+        rel.setup({
+          table: this.$table.name,
+          schema: (def.include || []).reduce((sch, field) => {
+            sch[field] = this.constructor.$schema[field];
+            return sch;
+          }, {}),
+        });
+      }
 
-      if (includeChanged || this._changes.changed(`:${name}:${item.pk}`, item)) {
-        let rel = item;
-        if (!(rel instanceof Relation)) {
-          rel = new Relation();
-          rel.setup({
-            table: this.$table.name,
-            schema: (def.include || []).reduce((sch, field) => {
-              sch[field] = this.constructor.$schema[field];
-              return sch;
-            }, {}),
-          });
-        }
-        // rel.dt = rel.constructor.$prefix;
-        rel.pk = this.pk;
-        rel.sk = sk;
-        rel.dt = this.pk;
+      if (includeChanged || this._state.changed('rel', $kt, rel)) {
+        rel.$id = this.$id;
+        rel.$kt = $kt;
+        rel.$sk = this.$id;
+        rel.$name = name;
         include.forEach((field) => {
           rel[field] = this[field];
         });
-        rel.label = this.label;
-        this._changes.setDirty('item');
         this._writes.push(['put', rel]);
       }
     }
-    relToDelete.forEach((sk) => {
+    relToDelete.forEach(($kt) => {
       const rel = new Relation();
-      rel.pk = this.pk;
-      rel.sk = sk;
+      rel.$id = this.$id;
+      rel.$kt = $kt;
       rel.setup({
         table: this.$table.name,
       });
-      this._changes.setDirty('item');
       this._writes.push(['delete', rel]);
     });
   }
@@ -594,58 +601,56 @@ class Entity extends Row {
   async commit() {
     const writes = this._writes;
     if (!writes.length) {
-      console.log('Nothing to save');
-      return;
+      return 0;
     }
     this.resetWrites();
-    this._changes.clear();
-    console.log('WRITES', writes);
+    // console.log('WRITES', writes);
     await this.$table.batchWrite(writes);
+    writes.forEach((w) => {
+      const [action, item] = w;
+      if (action !== 'put') {
+        return;
+      }
+      if (item instanceof Entity) {
+        const $ktInfo = this.$table.parseKey(item.$kt);
+        if ($ktInfo.version) {
+          this._versions.push(item); // Put version
+        } else {
+          // console.log('#### RESET ENTITY');
+          this._state.initEntity(this);
+        }
+      } else if (item instanceof Relation) {
+        // console.log('#### RESET RELATION', item.$kt, item.toJSON());
+        this._state.set('rel', item.$kt, item, true);
+      } else if (item instanceof Index) {
+        // console.log('#### RESET INDEX', item.$kt);
+        this._state.set('idx', item.$kt, item, true);
+      }
+    });
+    this._state.set('rel', 'keys', this._pendingRelationsKeys, true);
+    return writes.length;
   }
 
   async delete() {
-    this.constructor.setup();
-    return this.$table.delete(this);
+    return this.constructor.delete(this.$id);
   }
 
   toJSON() {
     return {
       id: this.id,
       ...super.toJSON(),
+      ...Object.keys(this.constructor.$relations)
+        .reduce((o, k) => {
+          if (!this[k]) {
+            o[k] = null;
+          } else if (this[k] instanceof Array) {
+            o[k] = this[k].map(v => v.toJSON());
+          } else {
+            o[k] = this[k].toJSON();
+          }
+          return o;
+        }, {}),
     };
-  }
-
-
-  _newIndex(name) {
-    const from = this;
-    const prefix = from.constructor.$prefix;
-    if (!classCache[prefix]) {
-      const table = from.constructor.$table;
-      const I = class extends Row {
-        static get $table() {
-          return table;
-        }
-
-        static get $prefix() {
-          return prefix;
-        }
-
-        set sk(value) {
-          //
-        }
-
-        get sk() {
-          return from.$table.formatKey({
-            entity: prefix,
-            index: name,
-          });
-        }
-      };
-      I.setup();
-      classCache[prefix] = I;
-    }
-    const Index = classCache[prefix];
-    return new Index();
   }
 }
 

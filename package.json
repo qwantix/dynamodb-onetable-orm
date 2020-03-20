@@ -1,6 +1,6 @@
 {
   "name": "dynamodb-onetable-orm",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "DynamoDB ORM for One Table pattern",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "@aws/dynamodb-data-marshaller": "^0.7.3",
     "@aws/dynamodb-expressions": "^0.7.3",
     "aws-sdk": "^2.556.0",
+    "fast-deep-equal": "^3.1.1",
+    "tape": "^4.13.0",
     "uuid": "^3.3.3"
   },
   "devDependencies": {

@@ -17,32 +17,22 @@ class Row {
 
   static get $schema() {
     return {
-      pk: {
+      $id: {
         type: 'String',
         keyType: 'HASH',
       },
-      sk: {
+      $kt: {
         type: 'String',
         keyType: 'RANGE',
         indexKeyConfigurations: {
           'gsi-index': 'HASH',
         },
       },
-      dt: {
+      $sk: {
         type: 'String',
         indexKeyConfigurations: {
           'gsi-index': 'RANGE',
         },
-      },
-      ss: { // Search string
-        type: 'String',
-      },
-      rl: { // Relation
-        type: 'Set',
-        memberType: 'String',
-      },
-      v: { // Version
-        type: 'Number',
       },
     };
   }
@@ -64,7 +54,7 @@ class Row {
     return this;
   }
 
-  setup(opts) {
+  setup(opts = null) {
     this.constructor.setup();
     if (!opts) {
       return this;
@@ -154,7 +144,7 @@ class Row {
     };
     return asJSON(this, {
       type: 'Document',
-      members: this.constructor.$schema,
+      members: this[DynamoDbSchema] || this.constructor.$schema,
     });
   }
 

@@ -1,58 +1,67 @@
 DynamoDB OneTable ORM
 ==================
 
-Simple ORM built on [DynamoDB Data Mapper](https://awslabs.github.io/dynamodb-data-mapper-js/) providing one table pattern
+Simple ORM built on [DynamoDB Data Mapper](https://awslabs.github.io/dynamodb-data-mapper-js/) providing one table pattern on single GSI
 
-In the following documentation it will be called **DOTO**
+It allow to store entity/relation in dynamodb
+
+## Overview
+
+DOTO use this builtin columns, all built in columns are prefixed by '$'
+
+| Column | Type        | Key              | Comment        |
+|--------|-------------|------------------|----------------|
+| `$id`  | String      | pk               | Identifer      |
+| `$kt`  | String      | sk, gsi-index.pk | Key type       |
+| `$sk`  | String      | gsi-index.sk     | Sort key       |
+| `$rl`  | Set(String) |                  | Relations      |
+| `$sf`  | Document    |                  | Search fields  |
+| `$ss`  | String      |                  | Search strings |
 
 
-Built int Columns
-- `pk` String (PK)
-- `sk` String (SK) (gsi-search pk)
-- `dt` String  (gsi-search sk)
-- `ss` String
-- `rl` Set(String)
+The cloud formation/serverless template:
+```yml
+Type: 'AWS::DynamoDB::Table'
+Properties:
+  TableName: 'MY_DOTO_TABLE'
+  AttributeDefinitions:
+    - AttributeName: $id
+      AttributeType: S
+    - AttributeName: $kt
+      AttributeType: S
+    - AttributeName: $sk
+      AttributeType: S
+
+  KeySchema:
+    - AttributeName: $id
+      KeyType: HASH
+    - AttributeName: $kt
+      KeyType: RANGE
+
+  GlobalSecondaryIndexes:
+    - IndexName: gsi-index
+      KeySchema:
+        - AttributeName: $kt
+          KeyType: HASH
+        - AttributeName: $sk
+          KeyType: RANGE
+      Projection:
+        ProjectionType: INCLUDE
+        NonKeyAttributes:
+          - $rl
+          - $sf
+          - $ss
+```
+
 
 ## Row types
 
-|                    | **pk**                     | **sk**                 |
-|--------------------|----------------------------|------------------------|
-| Entity             | MyEntity:1                 | MyEntity               |
-| Indexed Field      | MyEntity:1                 | MyEntity$foo           |
-| Entity Versioned   | MyEntity:1                 | MyEntity#000001        |
-| Relation           | MyEntity:1                 | MyOtherEntity:1        |
-
-
-MyEntity$foo#0000001
-
-### Entity
-
-Base type, used to store item
-
-- `pk` : `NAME`:`ID`
-- `sk` : `NAME`
-- `dt` : As you want, by default the creation date
-
-### Entity Indexed Field
-
-Used to index field
-
-- `pk` : `NAME`:`ID`
-- `sk` : $`FIELD`
-- `dt` : The field value as string
-- `value`: The raw value
-
-
-### EntityVersioned
-
-- `pk` : `NAME`:`ID`
-- `sk` : `NAME`#`VERSION`
-
-### Relation
-
-- `pk` : `NAME`:`ID`
-- `sk` : `RELATION_NAME`:`RELATION_ID`
-
+|                    | **$id**                     | **kt**                         |
+|--------------------|----------------------------|---------------------------------|
+| Entity             | MyEntity:1                 | MyEntity                        |
+| Indexed Field      | MyEntity:1                 | MyEntity$foo                    |
+| Entity Versioned   | MyEntity:1                 | MyEntity#000001                 |
+| Relation           | MyEntity:1                 | MyEntity$myRel@MyOtherEntity:1  |
 
 
 
@@ -81,7 +90,7 @@ Table.setDefault(TABLE_NAME, {
 
 #### Simple model
 ```js
-const { Entity } = require('dynamodb-onetable-orm');
+const { Entity, filters } = require('dynamodb-onetable-orm');
 
 class MyModel extends Entity {
   static get $schema() {
@@ -89,11 +98,6 @@ class MyModel extends Entity {
     return {
       foo: {
         type: 'String',
-
-        // Additional settings
-        indexed: false, // Index this field,
-        searchable: false, // Make searchable
-        versioned: false, // Include in version snapshot, see versioning
       },
       bar: {
         type: 'Numeric'
@@ -102,10 +106,25 @@ class MyModel extends Entity {
   }
 }
 
+// Create
+const m = new MyModel()
+m.foo = 'The foo value'
+await m.save()
+
+// Get
+const m = await MyModel.get('theID')
+
+// Find
+const { items } = await MyModel.query()
+  .addFilter(
+    filters.equals('foo', 'The foo value'),
+  )
+  .find()
+
 ```
 #### Relations
 
-Of course, DOTO manages the relationships
+DOTO allow to manages the relationships
 
 ```js
 class MyModel extends Entity {
@@ -122,7 +141,6 @@ class MyModel extends Entity {
         // Optionals
         multiple: false, // Relation can be 1:n or n:m, default false
         include: ['label'], // Include given field to relation, default: []
-        searchable: false, // Make relation searchable, default false
       },
       blah: {
         type: Bla,
@@ -130,6 +148,84 @@ class MyModel extends Entity {
     };
   }
 }
+
+// Usage
+
+const m = new MyModel()
+
+const foo1 = await Foo.get('somefoo')
+const foo2 = await Foo.get('somefoo2')
+const blah = await Bla.get('blah')
+m.foos = [foo1, foo2]
+m.blah = blah
+await m.save()
+
+
+// Find
+const { items } = await MyModel.query()
+  .usingRelation('foos', 'foo1')
+  .find()
+
+```
+
+#### Indexes
+
+You can manage multiple indexes for search
+
+```js
+class MyModel extends Entity {
+  static get $schema() {
+    return {
+      // .... Your schema defintion
+    }
+  }
+
+  static get $indexes() {
+    return {
+      bar1: true, // Index this field
+      index1: { // Custom index
+        data(item) {
+          return `${item.bar1}+${item.bar2}`;
+        },
+        include: ['bar1', 'bar2'],
+      },
+      index2: {
+        include: ['bar1','bar2],
+        // You can define search by prop search
+
+        search: ['bar2'], // List of fields can be searchable
+        // or
+        search: true // Apply search to
+        // or
+        search: {
+          fields: ['bar2'], // If no field defined, will use 'include'
+          normalizer: (v) => {return v.replace(/x/,'')},
+          // or
+          normalizer: ['lower', 'trim', 'no-accents', (v) => {return v.replace(/x/,'')}] // As pipeline
+        }
+      }
+    };
+  }
+}
+
+// Usage
+
+const m = new MyModel()
+
+const foo1 = await Foo.get('somefoo')
+const foo2 = await Foo.get('somefoo2')
+const blah = await Bla.get('blah')
+m.foos = [foo1, foo2]
+m.blah = blah
+await m.save()
+
+// Find
+const { items } = await MyModel.query()
+  .usingIndex('index2')
+  .addFilter(
+    ...
+  )
+  .find()
 
 ```
 
@@ -154,55 +250,15 @@ class MyModel extends Entity {
 
   // Define the maximum version to keep, here 2
   static get $maxVersions() {
-    return 2; // -1 for unlimited
+    return 2; // -1 for unlimited, 0 not versionned
   }
 }
 ```
 
 
+### Misc
 
-### 3. Using model
-
-```js
-
-const m = new MyModel()
-m.foo = 'Hello'
-await m.save()
-
-const ID = m.id // ID generated if not set
-
-/// Update
-
-const m = await MyModel.get(ID);
-m.foo += ' World';
-await m.save();
-
-
-/// Relations
-
-m.foos = [
-  new Foo("XXX"),
-];
-await m.save();
-
-
-/// Searching
-
-await MyModel.find({
-  // Sorting
-  revert: false, // Sort revert
-
-  // Pagination
-  limit: 10,  // Max limit
-  page: 1, // Page
-  pageSize: 10, // Max result by page
-
-  // Filter
-  data: {}, // Data filter,  DynamodDB Expression
-  search: '', // Full text search
-  filter: {}, // RAW DynamodDB Expression
-  relatedTo: [] // Array of relation
-  //
-})
-
+Improve doto performance using:
+```sh
+export AWS_NODEJS_CONNECTION_REUSE_ENABLED=1
 ```
