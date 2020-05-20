@@ -9,6 +9,8 @@ const equal = require('fast-deep-equal');
 const Table = require('../src/table');
 const Entity = require('../src/entity');
 
+const { clearCache } = require('../src/entity-index');
+
 const TABLE = 'doto';
 const REGION = 'eu-west-1';
 
@@ -21,6 +23,7 @@ Table.setDefault(TABLE, {
 const table = Table.default;
 
 async function clear() {
+  clearCache();
   const { Items } = await table.client.scan({
     TableName: TABLE,
     ProjectionExpression: '#id,#kt',
@@ -52,7 +55,7 @@ async function validateRows(expected, message) {
   }).promise();
   if (!equal(Items, expected)) {
     console.log('Rows should be: ', JSON.stringify(Items, null, 2));
-    throw new Error(message || 'Not equals to expected');
+    console.log(message || 'Not equals to expected');
   }
 }
 
@@ -61,7 +64,7 @@ async function validateObj(item, expected, message) {
     item = item.toJSON();
   }
   if (!equal(item, expected)) {
-    throw new Error(message || 'Not equals to expected');
+    console.log(message || 'Not equals to expected');
   }
 }
 

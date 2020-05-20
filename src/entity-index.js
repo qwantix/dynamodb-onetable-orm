@@ -1,6 +1,10 @@
 const Row = require('./row');
 
-const classCache = {};
+let classCache = {};
+
+function clearCache() {
+  classCache = {};
+}
 
 function getNormalizer(normalizers) {
   // eslint-disable-next-line no-shadow
@@ -63,7 +67,6 @@ function getSearchParams({ search, include }) {
     normalizer,
   };
 }
-
 
 class Index extends Row {
   constructor() {
@@ -201,16 +204,15 @@ function getIndexCls(from, name) {
   return classCache[key];
 }
 
-
 function newIndex(from, name) {
   const I = getIndexCls(from, name);
   return new I();
 }
-
 
 module.exports = {
   Index,
   newIndex,
   getIndexCls,
   getIndexParams,
+  clearCache,
 };
