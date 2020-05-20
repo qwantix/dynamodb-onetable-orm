@@ -295,8 +295,8 @@ class Query {
    * Add filter
    * @param {string} filter
    */
-  addFilter(filter) {
-    this._filters.push(filter);
+  addFilter(...filter) {
+    this._filters = [...this._filters, ...filter];
     return this;
   }
 
