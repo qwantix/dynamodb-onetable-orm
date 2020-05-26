@@ -1,4 +1,3 @@
-
 const test = require('tape');
 const {
   clear,
@@ -25,7 +24,6 @@ class Foo extends Entity {
   }
 }
 
-
 test('Create entity versioned', async (t) => {
   await clear();
   // Create
@@ -34,42 +32,23 @@ test('Create entity versioned', async (t) => {
   obj.bar2 = 'mybar2';
   const writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
-  await validateRows(t, t, [
+  await validateRows(t, [
     {
-      bar1: {
-        S: 'mybar1',
-      },
-      bar2: {
-        S: 'mybar2',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo',
-      },
+      bar1: { S: 'mybar1' },
+      bar2: { S: 'mybar2' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo' },
     },
     {
-      bar2: {
-        S: 'mybar2',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000001',
-      },
+      bar2: { S: 'mybar2' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000001' },
     },
   ], 'Invalid creation');
   t.end();
 });
-
 
 test('Update entity versioned', async (t) => {
   await clear();
@@ -80,35 +59,17 @@ test('Update entity versioned', async (t) => {
   let writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
   await validateRows(t, [{
-    bar1: {
-      S: 'mybar1',
-    },
-    bar2: {
-      S: 'mybar2',
-    },
-    $sk: {
-      S: 'test',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo',
-    },
+    bar1: { S: 'mybar1' },
+    bar2: { S: 'mybar2' },
+    $sk: { S: 'test' },
+    $id: { S: 'Foo:test' },
+    $kt: { S: 'Foo' },
   },
   {
-    bar2: {
-      S: 'mybar2',
-    },
-    $sk: {
-      S: 'test',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo#000001',
-    },
+    bar2: { S: 'mybar2' },
+    $sk: { S: 'test' },
+    $id: { S: 'Foo:test' },
+    $kt: { S: 'Foo#000001' },
   },
   ], 'Invalid creation');
   writes = await obj.save();
@@ -121,54 +82,25 @@ test('Update entity versioned', async (t) => {
 
   await validateRows(t, [
     {
-      bar1: {
-        S: 'mybar1updated',
-      },
-      bar2: {
-        S: 'mybar2updated',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo',
-      },
+      bar1: { S: 'mybar1updated' },
+      bar2: { S: 'mybar2updated' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo' },
     },
     {
-      bar2: {
-        S: 'mybar2',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000001',
-      },
+      bar2: { S: 'mybar2' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000001' },
     },
     {
-      bar2: {
-        S: 'mybar2updated',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000002',
-      },
+      bar2: { S: 'mybar2updated' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000002' },
     },
-
-
   ], 'Invalid update');
-
 
   obj = await Foo.get('test');
   obj.bar1 = 'plop';
@@ -187,70 +119,35 @@ test('Update entity versioned', async (t) => {
 
   await validateRows(t, [
     {
-      bar1: {
-        S: 'plop',
-      },
-      bar2: {
-        S: 'plap',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo',
-      },
+      bar1: { S: 'plop' },
+      bar2: { S: 'plap' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo' },
     },
     {
-      bar2: {
-        S: 'mybar2updated',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000002',
-      },
+      bar2: { S: 'mybar2updated' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000002' },
     },
     {
-      bar2: {
-        S: 'plip',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000003',
-      },
+      bar2: { S: 'plip' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000003' },
     },
     {
-      bar2: {
-        S: 'plap',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo#000004',
-      },
+      bar2: { S: 'plap' },
+      $sk: { S: 'test' },
+      $id: { S: 'Foo:test' },
+      $kt: { S: 'Foo#000004' },
     },
 
   ], 'Invalid update');
 
   t.end();
 });
-
 
 test('Delete entity', async (t) => {
   await clear();
