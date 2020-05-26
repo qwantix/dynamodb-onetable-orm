@@ -149,54 +149,26 @@ test('Update entity with index', async (t) => {
   writes = await bagTwo.save();
   t.equals(writes, 4, 'Numbers of writes should be equals to 4');
   await validateRows(t, [{
-    $sk: {
-      S: 'bagxxx',
-    },
-    $kt: {
-      S: 'Bag',
-    },
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    label: {
-      S: 'Bag Triple X',
-    },
+    $sk: { S: 'bagxxx' },
+    $kt: { S: 'Bag' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'Bag Triple X' },
   },
   {
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$largeSlot@Item:itemId3',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId3' },
   },
   {
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$largeSlot@Item:itemId4',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId4' },
   },
   {
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$smalSlot@Item:newItemId',
-    },
-    label: {
-      S: 'Bag Triple X',
-    },
+    $sk: { S: 'Bag:bagxxx' },
+    $id: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$smallSlot@Item:newItemId' },
+    label: { S: 'Bag Triple X' },
   },
   ], 'Invalid update');
 
@@ -205,54 +177,26 @@ test('Update entity with index', async (t) => {
   writes = await bagTwo.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
   await validateRows(t, [{
-    $sk: {
-      S: 'bagxxx',
-    },
-    $kt: {
-      S: 'Bag',
-    },
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    label: {
-      S: 'renamedBag',
-    },
+    $sk: { S: 'bagxxx' },
+    $kt: { S: 'Bag' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'renamedBag' },
   },
   {
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$largeSlot@Item:itemId3',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId3' },
   },
   {
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$largeSlot@Item:itemId4',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId4' },
   },
   {
-    $sk: {
-      S: 'Bag:bagxxx',
-    },
-    $kt: {
-      S: 'Bag$smallSlot@Item:itemId',
-    },
-    $id: {
-      S: 'Bag:bagxxx',
-    },
-    label: {
-      S: 'renamedBag',
-    },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$smallSlot@Item:newItemId' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'renamedBag' },
   },
   ], 'Invalid update');
   t.end();
