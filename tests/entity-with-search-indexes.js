@@ -62,7 +62,7 @@ test('Create entity with index', async (t) => {
   obj.mainbar = new Bar('mainbar');
   const writes = await obj.save();
   t.equals(writes, 5, 'Numbers of writes should be equals to 5');
-  await validateRows([
+  await validateRows(t, [
     {
       bar1: {
         S: 'myBar1éé',
@@ -166,12 +166,16 @@ test('Delete entity', async (t) => {
   obj.mainbar = new Bar('mainbar');
   await obj.save();
   await obj.delete();
-  await validateRows([], 'Invalid deletion');
+  await validateRows(t, [], 'Invalid deletion');
   t.end();
 });
 
 
 test('Find on fullsearch', async (t) => {
+  const HELENA = {
+    bar1: 'Jack',
+    bar2: 'Elena',
+  };
   await clear();
   // Create
   await new Foo({
@@ -186,8 +190,7 @@ test('Find on fullsearch', async (t) => {
   }).save();
   await new Foo({
     id: 'test2',
-    bar1: 'Jack',
-    bar2: 'Elena',
+    ...HELENA,
     mainbar: new Bar('themainbar2'),
     bars: [
       new Bar('bar1'),
@@ -228,6 +231,8 @@ test('Find on fullsearch', async (t) => {
       filters.containsLike('bar2', 'eNa'),
     )
     .find();
+  t.equals(res.items[0].bar1, HELENA.bar1);
+  t.equals(res.items[0].bar2, HELENA.bar2);
   t.equals(res.items.length, 1);
 
   res = await Foo.query()
@@ -244,6 +249,8 @@ test('Find on fullsearch', async (t) => {
       filters.beginsLike('bar2', 'ELeNa'),
     )
     .find();
+  t.equals(res.items[0].bar1, HELENA.bar1);
+  t.equals(res.items[0].bar2, HELENA.bar2);
   t.equals(res.items.length, 1);
 
   res = await Foo.query()
@@ -260,6 +267,9 @@ test('Find on fullsearch', async (t) => {
       filters.like('bar2', 'ELeNa'),
     )
     .find();
+
+  t.equals(res.items[0].bar1, HELENA.bar1);
+  t.equals(res.items[0].bar2, HELENA.bar2);
   t.equals(res.items.length, 1);
 
   res = await Foo.query()
@@ -274,6 +284,15 @@ test('Find on fullsearch', async (t) => {
     .usingIndex('index1')
     .addFilter(
       filters.notRelatedTo('bars', 'bar3'),
+      filters.containsLike('bar2', 'eNa'),
+    )
+    .find();
+  t.equals(res.items.length, 0);
+
+  res = await Foo.query()
+    .usingIndex('index1')
+    .addFilter(
+      filters.notRelatedTo('bars', 'bar2'),
       filters.containsLike('bar2', 'eNa'),
     )
     .find();

@@ -29,7 +29,7 @@ test('Create entity', async (t) => {
   obj.bar1 = 'mybar1';
   const writes = await obj.save();
   t.equals(writes, 1, 'Numbers of writes should be equals to 1');
-  await validateRows([
+  await validateRows(t, [
     {
       bar1: {
         S: 'mybar1',
@@ -56,7 +56,7 @@ test('Update entity', async (t) => {
   obj.bar1 = 'mybar1';
   let writes = await obj.save();
   t.equals(writes, 1, 'Numbers of writes should be equals to 1');
-  await validateRows([{
+  await validateRows(t, [{
     bar1: {
       S: 'mybar1',
     },
@@ -79,7 +79,7 @@ test('Update entity', async (t) => {
   writes = await obj.save();
   t.equals(writes, 1, 'Numbers of writes should be equals to 1');
 
-  await validateRows([{
+  await validateRows(t, [{
     bar1: {
       S: 'mybar1updated',
     },
@@ -107,7 +107,7 @@ test('Get entity', async (t) => {
   const obj = new Foo('test');
   obj.bar1 = 'mybar1';
   await obj.save();
-  await validateRows([{
+  await validateRows(t, [{
     bar1: {
       S: 'mybar1',
     },
@@ -123,7 +123,7 @@ test('Get entity', async (t) => {
   }], 'Invalid creation');
   // Get
   const obj1 = await Foo.get('test');
-  validateObj(obj1, {
+  validateObj(t, obj1, {
     id: 'test',
     bar1: 'mybar1',
   });
@@ -163,7 +163,7 @@ test('Delete entity', async (t) => {
   });
   await obj.save();
   await obj.delete();
-  await validateRows([], 'Invalid deletion');
+  await validateRows(t, [], 'Invalid deletion');
 
   t.end();
 });

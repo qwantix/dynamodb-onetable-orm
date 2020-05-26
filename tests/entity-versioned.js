@@ -34,7 +34,7 @@ test('Create entity versioned', async (t) => {
   obj.bar2 = 'mybar2';
   const writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
-  await validateRows([
+  await validateRows(t, t, [
     {
       bar1: {
         S: 'mybar1',
@@ -79,7 +79,7 @@ test('Update entity versioned', async (t) => {
   obj.bar2 = 'mybar2';
   let writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
-  await validateRows([{
+  await validateRows(t, [{
     bar1: {
       S: 'mybar1',
     },
@@ -119,7 +119,7 @@ test('Update entity versioned', async (t) => {
   writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
 
-  await validateRows([
+  await validateRows(t, [
     {
       bar1: {
         S: 'mybar1updated',
@@ -185,7 +185,7 @@ test('Update entity versioned', async (t) => {
   writes = await obj.save();
   t.equals(writes, 3, 'Numbers of writes should be equals to 3, because should remove extra versions');
 
-  await validateRows([
+  await validateRows(t, [
     {
       bar1: {
         S: 'plop',
@@ -264,7 +264,7 @@ test('Delete entity', async (t) => {
   obj.bar2 = 'mybar2updated';
   await obj.save();
   await obj.delete();
-  await validateRows([], 'Invalid deletion');
+  await validateRows(t, [], 'Invalid deletion');
 
   t.end();
 });

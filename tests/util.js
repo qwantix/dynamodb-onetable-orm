@@ -49,22 +49,25 @@ async function clear() {
   })));
 }
 
-async function validateRows(expected, message) {
+async function validateRows(assert, expected, message) {
   const { Items } = await table.client.scan({
     TableName: TABLE,
   }).promise();
   if (!equal(Items, expected)) {
-    console.log('Rows should be: ', JSON.stringify(Items, null, 2));
-    console.log(message || 'Not equals to expected');
+    assert.fail(message || 'Not equals to expected');
+  } else {
+    assert.pass('Rows valid');
   }
 }
 
-async function validateObj(item, expected, message) {
+async function validateObj(assert, item, expected, message) {
   if (item instanceof Entity) {
     item = item.toJSON();
   }
   if (!equal(item, expected)) {
-    console.log(message || 'Not equals to expected');
+    assert.fail(message || 'Not equals to expected');
+  } else {
+    assert.pass('Object valid');
   }
 }
 
