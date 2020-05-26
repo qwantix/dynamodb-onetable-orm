@@ -8,6 +8,7 @@ const {
 } = require('./util');
 
 const Entity = require('../src/entity');
+const filters = require('../src/filters');
 
 class User extends Entity {
   static get $schema() {
@@ -17,6 +18,9 @@ class User extends Entity {
       },
       lastname: {
         type: 'String',
+      },
+      age: {
+        type: 'Number',
       },
     };
   }
@@ -126,7 +130,6 @@ test('Find entity', async (t) => {
   t.end();
 });
 
-
 test('Delete entity', async (t) => {
   await clear();
 
@@ -138,5 +141,21 @@ test('Delete entity', async (t) => {
   await obj.delete();
   await validateRows(t, [], 'Invalid deletion');
 
+  t.end();
+});
+
+test.only('Tryng to filter with no indexes', async (t) => {
+  await clear();
+
+  try {
+    await User.query()
+      .addFilter(
+        filters.notEquals('lastname', 'Greybeards'),
+      )
+      .find();
+    t.fail('Should not get here');
+  } catch (err) {
+    t.ok(err, 'Got expected error');
+  }
   t.end();
 });
