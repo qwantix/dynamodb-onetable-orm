@@ -144,7 +144,7 @@ test('Delete entity', async (t) => {
   t.end();
 });
 
-test.only('Tryng to filter with no indexes', async (t) => {
+test('Trying to filter with no indexes', async (t) => {
   await clear();
 
   try {
