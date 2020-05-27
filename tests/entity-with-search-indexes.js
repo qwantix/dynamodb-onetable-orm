@@ -1,4 +1,3 @@
-
 const test = require('tape');
 const {
   clear,
@@ -8,17 +7,17 @@ const {
 const Entity = require('../src/entity');
 const filters = require('../src/filters');
 
-class Bar extends Entity {
+class Item extends Entity {
 
 }
 
-class Foo extends Entity {
+class Hero extends Entity {
   static get $schema() {
     return {
-      bar1: {
+      name: {
         type: 'String',
       },
-      bar2: {
+      class: {
         type: 'String',
       },
     };
@@ -26,11 +25,11 @@ class Foo extends Entity {
 
   static get $relations() {
     return {
-      mainbar: {
-        type: Bar,
+      equipped: {
+        type: Item,
       },
-      bars: {
-        type: Bar,
+      inventory: {
+        type: Item,
         multiple: true,
       },
     };
@@ -40,13 +39,13 @@ class Foo extends Entity {
     return {
       index1: {
         data(item) {
-          return `${item.bar1}+${item.bar2}`;
+          return `${item.name}+${item.class}`;
         },
-        include: ['bar1', 'bar2'],
+        include: ['name', 'class'],
         search: {
           normalizer: ['ci', 'no-accent', 'trim', 'no-extra-whitespace'],
         },
-        relations: ['mainbar', 'bars'],
+        relations: ['equipped', 'inventory'],
       },
     };
   }
@@ -55,101 +54,59 @@ class Foo extends Entity {
 test('Create entity with index', async (t) => {
   await clear();
   // Create
-  const obj = new Foo('test');
-  obj.bar1 = 'myBar1éé';
-  obj.bar2 = 'myBar2àà';
-  obj.bars = [new Bar('b1'), new Bar('b2')];
-  obj.mainbar = new Bar('mainbar');
-  const writes = await obj.save();
+  const hero = new Hero('dovakin');
+  hero.name = 'Døvakin';
+  hero.class = 'Warrior';
+  hero.inventory = [new Item('heal'), new Item('mana')];
+  hero.equipped = new Item('sword');
+  const writes = await hero.save();
   t.equals(writes, 5, 'Numbers of writes should be equals to 5');
   await validateRows(t, [
     {
-      bar1: {
-        S: 'myBar1éé',
-      },
-      bar2: {
-        S: 'myBar2àà',
-      },
-      $sk: {
-        S: 'test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo',
-      },
+      $sk: { S: 'dovakin' },
+      name: { S: 'Døvakin' },
+      class: { S: 'Warrior' },
+      $kt: { S: 'Hero' },
+      $id: { S: 'Hero:dovakin' },
     },
     {
-      $sk: {
-        S: 'Foo:test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo$bars@Bar:b1',
-      },
+      $kt: { S: 'Hero$equipped@Item:sword' },
+      $sk: { S: 'Hero:dovakin' },
+      $id: { S: 'Hero:dovakin' },
     },
     {
-      $sk: {
-        S: 'Foo:test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo$bars@Bar:b2',
-      },
-    },
-    {
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo$index1',
-      },
-      $rl: {
-        SS: [
-          'Foo$bars@Bar:b1',
-          'Foo$bars@Bar:b2',
-          'Foo$mainbar@Bar:mainbar',
-        ],
-      },
-      $sf: {
-        M: {
-          bar1: {
-            S: 'myBar1éé',
-          },
-          bar2: {
-            S: 'myBar2àà',
-          },
-        },
-      },
-      $sk: {
-        S: 'myBar1éé+myBar2àà',
-      },
       $ss: {
         M: {
-          bar1: {
-            S: 'mybar1ee',
-          },
-          bar2: {
-            S: 'mybar2aa',
-          },
+          name: { S: 'døvakin' },
+          class: { S: 'warrior' },
         },
       },
+      $sk: { S: 'Døvakin+Warrior' },
+      $rl: {
+        SS: [
+          'Hero$equipped@Item:sword',
+          'Hero$inventory@Item:heal',
+          'Hero$inventory@Item:mana',
+        ],
+      },
+      $kt: { S: 'Hero$index1' },
+      $sf: {
+        M: {
+          name: { S: 'Døvakin' },
+          class: { S: 'Warrior' },
+        },
+      },
+      $id: { S: 'Hero:dovakin' },
     },
     {
-      $sk: {
-        S: 'Foo:test',
-      },
-      $id: {
-        S: 'Foo:test',
-      },
-      $kt: {
-        S: 'Foo$mainbar@Bar:mainbar',
-      },
+      $kt: { S: 'Hero$inventory@Item:heal' },
+      $sk: { S: 'Hero:dovakin' },
+      $id: { S: 'Hero:dovakin' },
+    },
+    {
+      $kt: { S: 'Hero$inventory@Item:mana' },
+      $sk: { S: 'Hero:dovakin' },
+      $id: { S: 'Hero:dovakin' },
     },
   ], 'Invalid creation');
   t.end();
@@ -159,11 +116,11 @@ test('Create entity with index', async (t) => {
 test('Delete entity', async (t) => {
   await clear();
 
-  const obj = new Foo('test');
-  obj.bar1 = 'myBar1éé';
-  obj.bar2 = 'myBar2àà';
-  obj.bars = [new Bar('b1'), new Bar('b2')];
-  obj.mainbar = new Bar('mainbar');
+  const obj = new Hero();
+  obj.name = 'Merlin';
+  obj.class = 'Mage';
+  obj.inventory = [new Item('1'), new Item('2')];
+  obj.equipped = new Item();
   await obj.save();
   await obj.delete();
   await validateRows(t, [], 'Invalid deletion');
@@ -173,130 +130,157 @@ test('Delete entity', async (t) => {
 
 test('Find on fullsearch', async (t) => {
   const HELENA = {
-    bar1: 'Jack',
-    bar2: 'Elena',
+    name: 'Jack',
+    class: 'Butcher',
   };
   await clear();
   // Create
-  await new Foo({
-    id: 'test1',
-    bar1: 'Joe',
-    bar2: 'Paul',
-    mainbar: new Bar('themainbar'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar2'),
+  await new Hero({
+    name: 'Joe',
+    class: 'Paul',
+    equipped: new Item('item'),
+    inventory: [
+      new Item('itemA'),
+      new Item('itemB'),
     ],
   }).save();
-  await new Foo({
-    id: 'test2',
+  await new Hero({
     ...HELENA,
-    mainbar: new Bar('themainbar2'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar3'),
+    equipped: new Item('item2'),
+    inventory: [
+      new Item('itemA'),
+      new Item('itemC'),
     ],
   }).save();
-  await new Foo({
-    id: 'test3',
-    bar1: 'George',
-    bar2: 'Jane',
-    mainbar: new Bar('themainbar'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar3'),
+  await new Hero({
+    name: 'George',
+    class: 'Jane',
+    equipped: new Item('item'),
+    inventory: [
+      new Item('itemA'),
+      new Item('itemC'),
     ],
   }).save();
   let res;
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.relatedTo('bars', 'bar3'),
+      filters.relatedTo('inventory', 'itemC'),
     )
     .find();
   t.equals(res.items.length, 2);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.notRelatedTo('bars', 'bar3'),
+      filters.notRelatedTo('inventory', 'itemC'),
     )
     .find();
   t.equals(res.items.length, 1);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.containsLike('bar2', 'eNa'),
+      filters.containsLike('class', 'bUt'),
     )
     .find();
-  t.equals(res.items[0].bar1, HELENA.bar1);
-  t.equals(res.items[0].bar2, HELENA.bar2);
+  t.equals(res.items[0].name, HELENA.name);
+  t.equals(res.items[0].class, HELENA.class);
   t.equals(res.items.length, 1);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.containsLike('bar2', 'YeNa'),
+      filters.containsLike('class', 'Ybut'),
     )
     .find();
   t.equals(res.items.length, 0);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.beginsLike('bar2', 'ELeNa'),
+      filters.beginsLike('class', 'BUTc'),
     )
     .find();
-  t.equals(res.items[0].bar1, HELENA.bar1);
-  t.equals(res.items[0].bar2, HELENA.bar2);
+  t.equals(res.items[0].name, HELENA.name);
+  t.equals(res.items[0].class, HELENA.class);
   t.equals(res.items.length, 1);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.beginsLike('bar2', 'ILeNa'),
+      filters.beginsLike('class', 'IBut'),
     )
     .find();
   t.equals(res.items.length, 0);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.like('bar2', 'ELeNa'),
+      filters.like('class', 'BUtcher'),
     )
     .find();
 
-  t.equals(res.items[0].bar1, HELENA.bar1);
-  t.equals(res.items[0].bar2, HELENA.bar2);
+  t.equals(res.items[0].name, HELENA.name);
+  t.equals(res.items[0].class, HELENA.class);
   t.equals(res.items.length, 1);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.like('bar2', 'ILeNa'),
+      filters.like('class', 'IButcH'),
     )
     .find();
   t.equals(res.items.length, 0);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.notRelatedTo('bars', 'bar3'),
-      filters.containsLike('bar2', 'eNa'),
+      filters.notRelatedTo('inventory', 'itemC'),
+      filters.containsLike('class', 'chEr'),
     )
     .find();
   t.equals(res.items.length, 0);
 
-  res = await Foo.query()
+  res = await Hero.query()
     .usingIndex('index1')
     .addFilter(
-      filters.notRelatedTo('bars', 'bar2'),
-      filters.containsLike('bar2', 'eNa'),
+      filters.notRelatedTo('inventory', 'itemB'),
+      filters.containsLike('class', 'chEr'),
     )
     .find();
   t.equals(res.items.length, 1);
 
   t.end();
 });
+
+/**
+ *   const users = [{
+    id: 'A',
+    firstname: 'Arngeir',
+    lastname: 'Greybeards',
+    age: 120,
+  },
+  {
+    id: 'B',
+    firstname: 'Paarthurnax',
+    lastname: 'Greybeards',
+    age: 5000,
+  },
+  {
+    id: 'C',
+    firstname: 'Wulfgar',
+    lastname: 'Greybeards',
+    age: 78,
+  },
+  {
+    id: 'D',
+    firstname: 'Dova',
+    lastname: 'Kin',
+    age: 33,
+  },
+  ];
+
+  await Promise.all(users.map(u => new User(u).save()));
+*/
