@@ -127,7 +127,6 @@ test('Delete entity', async (t) => {
   t.end();
 });
 
-
 test('Find on fullsearch', async (t) => {
   const HELENA = {
     name: 'Jack',
@@ -254,33 +253,3 @@ test('Find on fullsearch', async (t) => {
 
   t.end();
 });
-
-/**
- *   const users = [{
-    id: 'A',
-    firstname: 'Arngeir',
-    lastname: 'Greybeards',
-    age: 120,
-  },
-  {
-    id: 'B',
-    firstname: 'Paarthurnax',
-    lastname: 'Greybeards',
-    age: 5000,
-  },
-  {
-    id: 'C',
-    firstname: 'Wulfgar',
-    lastname: 'Greybeards',
-    age: 78,
-  },
-  {
-    id: 'D',
-    firstname: 'Dova',
-    lastname: 'Kin',
-    age: 33,
-  },
-  ];
-
-  await Promise.all(users.map(u => new User(u).save()));
-*/

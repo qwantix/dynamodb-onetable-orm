@@ -1,12 +1,10 @@
 /* eslint-disable no-await-in-loop */
-
 const crypto = require('crypto');
 
 const {
   AttributePath,
 } = require('@aws/dynamodb-expressions');
 const filters = require('./filters');
-
 
 /**
  * Returns 32 bytes key
@@ -51,7 +49,6 @@ function decodeContinuationToken(token, encryptionKey) {
     return null;
   }
 }
-
 
 function updateFilterWithPrefix(filter, prefix, depth = 10) {
   const out = { ...filter };
@@ -300,7 +297,6 @@ class Query {
     return this;
   }
 
-
   /**
    * Set continuation token returned by query
    *
@@ -356,7 +352,6 @@ class Query {
         break;
       default:
     }
-
 
     if (skCondition) {
       // Sort key condition? add it
@@ -466,6 +461,5 @@ class Query {
     return count;
   }
 }
-
 
 module.exports = Query;
