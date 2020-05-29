@@ -20,7 +20,6 @@ class State {
     }
   }
 
-
   reset(ns, key) {
     this._values.delete(K(ns, key));
     this._dirty.delete(K(ns, key));

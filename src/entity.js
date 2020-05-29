@@ -214,7 +214,6 @@ class Entity extends Row {
     return item;
   }
 
-
   static async delete(id) {
     this.setup();
 

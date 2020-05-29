@@ -25,7 +25,6 @@ const defaultConfig = {
   continuationTokenEncryptionKey: '',
 };
 
-
 class Table {
   static setDefault(name, opts) {
     if (name instanceof Table) {
