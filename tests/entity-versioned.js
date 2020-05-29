@@ -6,13 +6,13 @@ const {
 
 const Entity = require('../src/entity');
 
-class Foo extends Entity {
+class User extends Entity {
   static get $schema() {
     return {
-      bar1: {
+      firstname: {
         type: 'String',
       },
-      bar2: {
+      lastname: {
         type: 'String',
         versioned: true,
       },
@@ -27,24 +27,24 @@ class Foo extends Entity {
 test('Create entity versioned', async (t) => {
   await clear();
   // Create
-  const obj = new Foo('test');
-  obj.bar1 = 'mybar1';
-  obj.bar2 = 'mybar2';
+  const obj = new User('test');
+  obj.firstname = 'mybar1';
+  obj.lastname = 'mybar2';
   const writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
   await validateRows(t, [
     {
-      bar1: { S: 'mybar1' },
-      bar2: { S: 'mybar2' },
+      firstname: { S: 'mybar1' },
+      lastname: { S: 'mybar2' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User' },
     },
     {
-      bar2: { S: 'mybar2' },
+      lastname: { S: 'mybar2' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000001' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000001' },
     },
   ], 'Invalid creation');
   t.end();
@@ -53,95 +53,95 @@ test('Create entity versioned', async (t) => {
 test('Update entity versioned', async (t) => {
   await clear();
   // Create
-  let obj = new Foo('test');
-  obj.bar1 = 'mybar1';
-  obj.bar2 = 'mybar2';
+  let obj = new User('test');
+  obj.firstname = 'mybar1';
+  obj.lastname = 'mybar2';
   let writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
   await validateRows(t, [{
-    bar1: { S: 'mybar1' },
-    bar2: { S: 'mybar2' },
+    firstname: { S: 'mybar1' },
+    lastname: { S: 'mybar2' },
     $sk: { S: 'test' },
-    $id: { S: 'Foo:test' },
-    $kt: { S: 'Foo' },
+    $id: { S: 'User:test' },
+    $kt: { S: 'User' },
   },
   {
-    bar2: { S: 'mybar2' },
+    lastname: { S: 'mybar2' },
     $sk: { S: 'test' },
-    $id: { S: 'Foo:test' },
-    $kt: { S: 'Foo#000001' },
+    $id: { S: 'User:test' },
+    $kt: { S: 'User#000001' },
   },
   ], 'Invalid creation');
   writes = await obj.save();
   t.equals(writes, 0, 'Numbers of writes should be equals to 0');
   // Update
-  obj.bar1 = 'mybar1updated';
-  obj.bar2 = 'mybar2updated';
+  obj.firstname = 'mybar1updated';
+  obj.lastname = 'mybar2updated';
   writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
 
   await validateRows(t, [
     {
-      bar1: { S: 'mybar1updated' },
-      bar2: { S: 'mybar2updated' },
+      firstname: { S: 'mybar1updated' },
+      lastname: { S: 'mybar2updated' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User' },
     },
     {
-      bar2: { S: 'mybar2' },
+      lastname: { S: 'mybar2' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000001' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000001' },
     },
     {
-      bar2: { S: 'mybar2updated' },
+      lastname: { S: 'mybar2updated' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000002' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000002' },
     },
   ], 'Invalid update');
 
-  obj = await Foo.get('test');
-  obj.bar1 = 'plop';
+  obj = await User.get('test');
+  obj.firstname = 'plop';
   writes = await obj.save();
   t.equals(writes, 1, 'Numbers of writes should be equals to 1, bar1 not versioned');
 
-  obj = await Foo.get('test');
-  obj.bar2 = 'plip';
+  obj = await User.get('test');
+  obj.lastname = 'plip';
   writes = await obj.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
 
-  obj = await Foo.get('test');
-  obj.bar2 = 'plap';
+  obj = await User.get('test');
+  obj.lastname = 'plap';
   writes = await obj.save();
   t.equals(writes, 3, 'Numbers of writes should be equals to 3, because should remove extra versions');
 
   await validateRows(t, [
     {
-      bar1: { S: 'plop' },
-      bar2: { S: 'plap' },
+      firstname: { S: 'plop' },
+      lastname: { S: 'plap' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User' },
     },
     {
-      bar2: { S: 'mybar2updated' },
+      lastname: { S: 'mybar2updated' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000002' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000002' },
     },
     {
-      bar2: { S: 'plip' },
+      lastname: { S: 'plip' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000003' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000003' },
     },
     {
-      bar2: { S: 'plap' },
+      lastname: { S: 'plap' },
       $sk: { S: 'test' },
-      $id: { S: 'Foo:test' },
-      $kt: { S: 'Foo#000004' },
+      $id: { S: 'User:test' },
+      $kt: { S: 'User#000004' },
     },
 
   ], 'Invalid update');
@@ -152,13 +152,12 @@ test('Update entity versioned', async (t) => {
 test('Delete entity', async (t) => {
   await clear();
 
-  const obj = new Foo({
-    id: 'test',
-    bar1: 'mybar1',
-    bar2: 'mybar2',
+  const obj = new User({
+    firstname: 'john',
+    lastname: 'doo',
   });
   await obj.save();
-  obj.bar2 = 'mybar2updated';
+  obj.lastname = 'doov2';
   await obj.save();
   await obj.delete();
   await validateRows(t, [], 'Invalid deletion');
