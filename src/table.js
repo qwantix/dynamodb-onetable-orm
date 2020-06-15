@@ -1,11 +1,17 @@
 
-
 const aws = require('aws-sdk');
 
 const {
   DataMapper,
 } = require('@aws/dynamodb-data-mapper');
 
+const {
+  marshallItem,
+} = require('@aws/dynamodb-data-marshaller');
+
+const {
+  DynamoDbSchema,
+} = require('@aws/dynamodb-data-mapper');
 
 const {
   iterateAwait,
@@ -23,6 +29,11 @@ const defaultConfig = {
   versionSize: 6,
   indexName: 'gsi-index',
   continuationTokenEncryptionKey: '',
+};
+
+const capitalize = (s) => {
+  if (typeof s !== 'string') return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 class Table {
@@ -76,6 +87,37 @@ class Table {
 
   async put(item, option) {
     return this.mapper.put(item, option);
+  }
+
+  async transactWriteItems(writes) {
+    return this.client.transactWriteItems({
+      TransactItems: writes.map(([action, entity]) => {
+        const payload = action === 'delete'
+          ? {
+            Key: {
+              $id: { S: entity.$id },
+              $kt: { S: entity.$kt },
+            },
+          }
+          : {
+            Item: {
+              $id: { S: entity.$id },
+              $kt: { S: entity.$kt },
+              $sk: { S: entity.$sk },
+              ...marshallItem(entity[DynamoDbSchema], entity),
+            },
+          };
+
+        const content = {
+          TableName: this.name,
+          ...payload,
+        };
+
+        return {
+          [capitalize(action)]: content,
+        };
+      }),
+    }).promise();
   }
 
   async batchWrite(writes) {

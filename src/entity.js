@@ -603,8 +603,8 @@ class Entity extends Row {
       return 0;
     }
     this.resetWrites();
-    // console.log('WRITES', writes);
-    await this.$table.batchWrite(writes);
+    // await this.$table.batchWrite(writes);
+    await this.$table.transactWriteItems(writes);
     writes.forEach((w) => {
       const [action, item] = w;
       if (action !== 'put') {
@@ -652,6 +652,5 @@ class Entity extends Row {
     };
   }
 }
-
 
 module.exports = Entity;
