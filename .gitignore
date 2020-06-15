@@ -13,3 +13,5 @@ package-lock.json
 samples.js
 .nyc_output
 coverage
+
+.vscode/
