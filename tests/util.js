@@ -71,7 +71,6 @@ async function validateObj(assert, item, expected, message) {
   }
 }
 
-
 module.exports = {
   Table,
   clear,
