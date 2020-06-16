@@ -24,6 +24,7 @@ const {
   genId,
 } = require('./utils');
 
+const MAX_TRANSAC_WRITE = 25;
 
 class Entity extends Row {
   /**
@@ -154,21 +155,17 @@ class Entity extends Row {
           if (Cls.prototype instanceof Relation) {
             const r = unmarshallItem(Cls.prototype[DynamoDbSchema], v, Cls);
             r.$name = name;
-            relations.push(
-              {
-                name, item: r, row: r, $kt,
-              },
-            );
+            relations.push({
+              name, item: r, row: r, $kt,
+            });
           } else {
             const row = unmarshallItem(Relation.prototype[DynamoDbSchema], v, Relation);
             const { relation } = this.$table.parseKey(row.$kt);
             const r = new Cls(relation);
             r.$name = name;
-            relations.push(
-              {
-                name, item: r, row, $kt,
-              },
-            );
+            relations.push({
+              name, item: r, row, $kt,
+            });
           }
         // If version
         } else if ($ktInfo.version && !$ktInfo.index && !$ktInfo.relation) {
@@ -603,8 +600,11 @@ class Entity extends Row {
       return 0;
     }
     this.resetWrites();
-    // await this.$table.batchWrite(writes);
-    await this.$table.transactWriteItems(writes);
+    if (writes.length <= MAX_TRANSAC_WRITE) {
+      await this.$table.transactWriteItems(writes);
+    } else {
+      await this.$table.batchWrite(writes);
+    }
     writes.forEach((w) => {
       const [action, item] = w;
       if (action !== 'put') {
