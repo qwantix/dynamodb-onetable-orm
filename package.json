@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node tests",
-    "coverage": "npx nyc --reporter=lcov npm t | faucet"
+    "coverage": "npx nyc --reporter=lcov npm t | faucet",
+    "lint": "eslint ."
   },
   "author": "Brice Dauzats",
   "license": "ISC",

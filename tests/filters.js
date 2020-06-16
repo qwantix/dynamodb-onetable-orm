@@ -6,7 +6,7 @@ const {
 const Entity = require('../src/entity');
 const {
   attributeExists, attributeNotExists, attributeType, fn,
-  not, greaterThan, greaterThanOrEqualTo, between, size,
+  not, greaterThan, greaterThanOrEqualTo, between,
   equals, notEquals, lessThan, lessThanOrEqualTo,
 } = require('../src/filters');
 

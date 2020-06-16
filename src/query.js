@@ -14,6 +14,7 @@ function asValidEncryptionKey(encryptionKey) {
   Buffer.from(String(encryptionKey) || '').copy(b, 0, 0, 32);
   return b;
 }
+
 function encodeContinuationToken(lastKey, encryptionKey) {
   if (!lastKey) {
     return null;
