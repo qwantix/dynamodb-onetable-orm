@@ -6,8 +6,8 @@ const {
 const Entity = require('../src/entity');
 const {
   attributeExists, attributeNotExists, attributeType, fn,
-  not, greaterThan, greaterThanOrEqualTo, between,
-  equals, notEquals, lessThan, lessThanOrEqualTo,
+  not, greaterThan, greaterThanOrEqualTo, between, memberOf,
+  equals, notEquals, lessThan, lessThanOrEqualTo, size,
 } = require('../src/filters');
 
 class Hero extends Entity {
@@ -21,6 +21,10 @@ class Hero extends Entity {
       },
       age: {
         type: 'Number',
+      },
+      inventory: {
+        type: 'List',
+        memberType: { type: 'String' },
       },
     };
   }
@@ -57,12 +61,14 @@ const HEROES = [{
   name: 'Wulfgar',
   class: 'Greybeards',
   age: 78,
+  inventory: ['Crap', 'Dung', 'Fluff'],
 },
 {
   id: 'D',
   name: 'Dova',
   class: 'Kin',
   age: 33,
+  inventory: ['Dust'],
 }, {
   name: 'Unknown',
   class: 'Unknown',
@@ -246,6 +252,17 @@ test('filters#fn', async (assert) => {
     .find();
 
   assert.equals(result.items.length, 1);
+  assert.end();
+});
+
+test('filters#memberOf', async (assert) => {
+  const result = await Hero.query()
+    .usingIndex('index1')
+    .addFilter(
+      memberOf('class', ['Kin', 'Unknown']),
+    )
+    .find();
+  assert.equals(result.items.length, 2);
   assert.end();
 });
 
