@@ -102,6 +102,14 @@ test('Create entity with index', async (t) => {
   t.end();
 });
 
+test('find all', async (t) => {
+  await clear();
+  await Promise.all([{ bar1: 'FancyBag' }, { bar1: 'DoggyBag' }].map(b => new Foo(b).save()));
+  const res = await Foo.query()
+    .find();
+  t.equals(res.items.length, 2);
+  t.end();
+});
 
 test('Get entity with index', async (t) => {
   await clear();
