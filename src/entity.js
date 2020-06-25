@@ -358,17 +358,18 @@ class Entity extends Row {
       this.$id = data;
     } else if (typeof data === 'object') {
       this.$id = data.$id || data.id;
-      Object.keys(this.constructor.$schema)
-        .forEach((k) => {
+
+      Object.keys(data).forEach((k) => {
+        if (this.constructor.$schema[k] || this.constructor.$relations[k]) {
           this[k] = data[k];
-        });
-      Object.keys(this.constructor.$relations)
-        .forEach((k) => {
-          if (data[k]) {
-            this[k] = data[k];
-          }
-        });
+        }
+      });
     }
+  }
+
+  async update(body = {}) {
+    this.setData(body);
+    return this.save();
   }
 
   async save() {
