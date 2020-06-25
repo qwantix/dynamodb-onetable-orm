@@ -3,6 +3,7 @@ const Relation = require('./src/relation');
 const Table = require('./src/table');
 const { Index } = require('./src/entity-index');
 const filters = require('./src/filters');
+const testUtils = require('./tests/util');
 
 module.exports = {
   Entity,
@@ -10,4 +11,5 @@ module.exports = {
   Index,
   Table,
   filters,
+  testUtils,
 };

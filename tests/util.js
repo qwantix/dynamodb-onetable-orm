@@ -22,9 +22,8 @@ Table.setDefault(TABLE, {
 
 const table = Table.default;
 
-async function clear() {
-  clearCache();
-  const { Items } = await table.client.scan({
+async function scan() {
+  return table.client.scan({
     TableName: TABLE,
     ProjectionExpression: '#id,#kt',
     ExpressionAttributeNames: {
@@ -32,7 +31,12 @@ async function clear() {
       '#kt': '$kt',
     },
   }).promise();
-  await table.batchDelete(Items.map(item => ({
+}
+
+async function clear() {
+  clearCache();
+  const { Items } = await scan();
+  return table.batchDelete(Items.map(item => ({
     [DynamoDbTable]: table.name,
     [DynamoDbSchema]: {
       $id: {
@@ -76,4 +80,5 @@ module.exports = {
   clear,
   validateRows,
   validateObj,
+  scan,
 };
