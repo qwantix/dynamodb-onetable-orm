@@ -180,6 +180,10 @@ class Query {
    * @returns {Query}
    */
   usingIndex(name) {
+    if (name === undefined) {
+      return this;
+    }
+
     this._using = {
       type: 'index',
       name,
