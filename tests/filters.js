@@ -266,6 +266,27 @@ test('filters#memberOf', async (assert) => {
   assert.end();
 });
 
+test('filters with function query', async (assert) => {
+  const result = await Hero
+    .query(filters => filters.attributeNotExists('age'))
+    .usingIndex('index1')
+    .find();
+  assert.equals(result.items.length, 1);
+  assert.end();
+});
+
+test('filter with function and multiple filters', async (assert) => {
+  const result = await Hero.query(f => [
+    f.notEquals('name', 'Paarthurnax'),
+    f.notEquals('name', 'Wulfgar'),
+  ])
+    .usingIndex('index1')
+    .find();
+
+  assert.equals(result.items.length, 3);
+  assert.end();
+});
+
 test('Teardown filters tests', async (assert) => {
   await clear();
   assert.end();

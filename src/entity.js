@@ -243,8 +243,8 @@ class Entity extends Row {
    * Create new query
    * @returns Query
    */
-  static query() {
-    const q = new Query();
+  static query(fn) {
+    const q = new Query(fn);
     q._entity = this;
     return q;
   }

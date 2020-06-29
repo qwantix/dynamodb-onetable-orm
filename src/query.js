@@ -134,7 +134,7 @@ function replaceSpecialFilters(filter, entity, index, depth = 10) {
 }
 
 class Query {
-  constructor() {
+  constructor(fn) {
     this._entity = null;
     this._scanIndexForward = true;
     this._limit = 100;
@@ -146,6 +146,17 @@ class Query {
     this._projection = ['$id', '$kt'];
     this._continuationToken = null;
     this._using = { type: null };
+
+    if (typeof fn === 'function') {
+      const customFilters = fn(filters);
+      if (customFilters) {
+        if (Array.isArray(customFilters)) {
+          this._filters = customFilters;
+        } else {
+          this._filters = [customFilters];
+        }
+      }
+    }
   }
 
   clone() {
