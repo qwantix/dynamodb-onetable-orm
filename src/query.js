@@ -376,10 +376,11 @@ class Query {
 
     let filter = null;
     if (filtersList && filtersList.length) {
-      if (filtersList.length > 1) {
-        filter = filters.and(...filtersList);
+      const clearedFilters = filtersList.filter((f) => f !== undefined);
+      if (clearedFilters.length > 1) {
+        filter = filters.and(...clearedFilters);
       } else {
-        filter = filtersList[0];
+        filter = clearedFilters[0];
       }
     }
 
