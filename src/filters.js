@@ -90,7 +90,7 @@ const filters = {
     };
   },
 
-  in(subject, ...values) {
+  memberOf(subject, values) {
     return {
       type: 'Membership',
       subject: asAttributePath(subject),
@@ -141,7 +141,6 @@ const filters = {
       condition: {
         type: '@relatedTo',
         relation: relationName,
-
         entityId,
       },
     };
@@ -191,6 +190,5 @@ const filters = {
     return false;
   },
 };
-
 
 module.exports = filters;

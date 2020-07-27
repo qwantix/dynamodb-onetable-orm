@@ -1,4 +1,3 @@
-
 const test = require('tape');
 const {
   clear,
@@ -8,11 +7,11 @@ const {
 
 const Entity = require('../src/entity');
 
-class Bar extends Entity {
+class Item extends Entity {
 
 }
 
-class Foo extends Entity {
+class Bag extends Entity {
   static get $schema() {
     return {
       label: {
@@ -23,12 +22,12 @@ class Foo extends Entity {
 
   static get $relations() {
     return {
-      mainbar: {
-        type: Bar,
+      smallSlot: {
+        type: Item,
         include: ['label'],
       },
-      bars: {
-        type: Bar,
+      largeSlot: {
+        type: Item,
         multiple: true,
       },
     };
@@ -38,306 +37,242 @@ class Foo extends Entity {
 test('Create entity with relation', async (t) => {
   await clear();
   // Create
-  const obj = new Foo('test');
-  obj.label = 'myFoo';
-  obj.mainbar = new Bar('themainbar');
-  obj.bars = [
-    new Bar('bar1'),
-    new Bar('bar2'),
+  const obj = new Bag('mainbag');
+  obj.label = 'myBag';
+  obj.smallSlot = new Item('itema');
+  obj.largeSlot = [
+    new Item('item1'),
+    new Item('item2'),
   ];
   const writes = await obj.save();
   t.equals(writes, 4, 'Numbers of writes should be equals to 4');
-  await validateRows([
+  await validateRows(t, [
     {
       $sk: {
-        S: 'test',
+        S: 'mainbag',
       },
       label: {
-        S: 'myFoo',
+        S: 'myBag',
       },
       $id: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $kt: {
-        S: 'Foo',
+        S: 'Bag',
       },
     },
     {
       $sk: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $id: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $kt: {
-        S: 'Foo$bars@Bar:bar1',
+        S: 'Bag$largeSlot@Item:item1',
       },
     },
     {
       $sk: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $id: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $kt: {
-        S: 'Foo$bars@Bar:bar2',
+        S: 'Bag$largeSlot@Item:item2',
       },
     },
     {
       $sk: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       label: {
-        S: 'myFoo',
+        S: 'myBag',
       },
       $id: {
-        S: 'Foo:test',
+        S: 'Bag:mainbag',
       },
       $kt: {
-        S: 'Foo$mainbar@Bar:themainbar',
+        S: 'Bag$smallSlot@Item:itema',
       },
     },
   ], 'Invalid creation');
   t.end();
 });
 
-
 test('Get entity with index', async (t) => {
   await clear();
   // Create
-  const obj = new Foo('test');
-  obj.label = 'myFoo';
-  obj.mainbar = new Bar('themainbar');
-  obj.bars = [
-    new Bar('bar1'),
-    new Bar('bar2'),
+  const obj = new Bag('bagid');
+  obj.label = 'Huge bag';
+  obj.smallSlot = new Item('itemid1');
+  obj.largeSlot = [
+    new Item('itemid2'),
+    new Item('itemid3'),
   ];
   const writes = await obj.save();
   t.equals(writes, 4, 'Numbers of writes should be equals to 4');
   // Get
-  const obj1 = await Foo.get('test');
-  validateObj(obj1, {
-    id: 'test',
-    label: 'myFoo',
-    mainbar: {
-      id: 'themainbar',
+  const obj1 = await Bag.get('bagid');
+  validateObj(t, obj1, {
+    id: 'bagid',
+    label: 'Huge bag',
+    smallSlot: {
+      id: 'itemid1',
     },
-    bars: [{
-      id: 'bar1',
+    largeSlot: [{
+      id: 'itemid2',
     }, {
-      id: 'bar2',
+      id: 'itemid3',
     }],
   });
   t.end();
 });
 
-
 test('Update entity with index', async (t) => {
   await clear();
   // Create
-  const obj = new Foo('test');
-  obj.label = 'myFoo';
-  obj.mainbar = new Bar('themainbar');
-  obj.bars = [
-    new Bar('bar1'),
-    new Bar('bar2'),
+  const bagOne = new Bag('bagxxx');
+  bagOne.label = 'Bag Triple X';
+  bagOne.smallSlot = new Item('itemId');
+  bagOne.largeSlot = [
+    new Item('itemId2'),
+    new Item('itemId3'),
   ];
-  let writes = await obj.save();
+  let writes = await bagOne.save();
   t.equals(writes, 4, 'Numbers of writes should be equals to 4');
   // Get
-  const obj1 = await Foo.get('test');
-  obj1.mainbar = new Bar('themainbar2');
-  obj1.bars = [...obj.bars.filter(o => o.id !== 'bar1'), new Bar('bar3')];
-  writes = await obj1.save();
+  const bagTwo = await Bag.get('bagxxx');
+  bagTwo.smallSlot = new Item('newItemId');
+  bagTwo.largeSlot = [...bagOne.largeSlot.filter(o => o.id !== 'itemId2'), new Item('itemId4')];
+  writes = await bagTwo.save();
   t.equals(writes, 4, 'Numbers of writes should be equals to 4');
-  await validateRows([{
-    $sk: {
-      S: 'test',
-    },
-    $kt: {
-      S: 'Foo',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    label: {
-      S: 'myFoo',
-    },
+  await validateRows(t, [{
+    $sk: { S: 'bagxxx' },
+    $kt: { S: 'Bag' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'Bag Triple X' },
   },
   {
-    $id: {
-      S: 'Foo:test',
-    },
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$bars@Bar:bar2',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId3' },
   },
   {
-    $id: {
-      S: 'Foo:test',
-    },
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$bars@Bar:bar3',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId4' },
   },
   {
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$mainbar@Bar:themainbar2',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    label: {
-      S: 'myFoo',
-    },
+    $sk: { S: 'Bag:bagxxx' },
+    $id: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$smallSlot@Item:newItemId' },
+    label: { S: 'Bag Triple X' },
   },
   ], 'Invalid update');
 
   // Update included file
-  obj1.label = 'myFooUpdated';
-  writes = await obj1.save();
+  bagTwo.label = 'renamedBag';
+  writes = await bagTwo.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
-  await validateRows([{
-    $sk: {
-      S: 'test',
-    },
-    $kt: {
-      S: 'Foo',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    label: {
-      S: 'myFooUpdated',
-    },
+  await validateRows(t, [{
+    $sk: { S: 'bagxxx' },
+    $kt: { S: 'Bag' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'renamedBag' },
   },
   {
-    $id: {
-      S: 'Foo:test',
-    },
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$bars@Bar:bar2',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId3' },
   },
   {
-    $id: {
-      S: 'Foo:test',
-    },
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$bars@Bar:bar3',
-    },
+    $id: { S: 'Bag:bagxxx' },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$largeSlot@Item:itemId4' },
   },
   {
-    $sk: {
-      S: 'Foo:test',
-    },
-    $kt: {
-      S: 'Foo$mainbar@Bar:themainbar2',
-    },
-    $id: {
-      S: 'Foo:test',
-    },
-    label: {
-      S: 'myFooUpdated',
-    },
+    $sk: { S: 'Bag:bagxxx' },
+    $kt: { S: 'Bag$smallSlot@Item:newItemId' },
+    $id: { S: 'Bag:bagxxx' },
+    label: { S: 'renamedBag' },
   },
   ], 'Invalid update');
-
-
   t.end();
 });
-
 
 test('Delete entity', async (t) => {
   await clear();
 
-  const obj = new Foo('test');
-  obj.label = 'myFoo';
-  obj.mainbar = new Bar('themainbar');
-  obj.bars = [
-    new Bar('bar1'),
-    new Bar('bar2'),
+  const obj = new Bag('1');
+  obj.label = 'To be deleted';
+  obj.smallSlot = new Item('A');
+  obj.largeSlot = [
+    new Item('B'),
+    new Item('C'),
   ];
   await obj.save();
   await obj.delete();
-  await validateRows([], 'Invalid deletion');
+  await validateRows(t, [], 'Invalid deletion');
   t.end();
 });
-
 
 test('Find on relation', async (t) => {
   await clear();
   // Create
-  await new Foo({
-    id: 'test1',
-    label: 'Foo1',
-    mainbar: new Bar('themainbar'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar2'),
+  await new Bag({
+    id: 'A',
+    label: 'Bag A',
+    smallSlot: new Item('itemA'),
+    largeSlot: [
+      new Item('item1'),
+      new Item('item2'),
     ],
   }).save();
-  await new Foo({
-    id: 'test2',
-    label: 'Foo2',
-    mainbar: new Bar('themainbar2'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar3'),
+  await new Bag({
+    id: 'B',
+    label: 'Bag B',
+    smallSlot: new Item('itemB'),
+    largeSlot: [
+      new Item('item1'),
+      new Item('item3'),
     ],
   }).save();
-  await new Foo({
-    id: 'test3',
+  await new Bag({
+    id: 'C',
     label: 'Foo3',
-    mainbar: new Bar('themainbar'),
-    bars: [
-      new Bar('bar1'),
-      new Bar('bar3'),
+    smallSlot: new Item('itemA'),
+    largeSlot: [
+      new Item('item1'),
+      new Item('item3'),
     ],
   }).save();
 
-  let res = await Foo.query()
-    .usingRelation('bars', 'bar3')
+  let res = await Bag.query()
+    .usingRelation('largeSlot', 'item3')
     .find();
 
   t.equals(res.items.length, 2);
-  t.equals(res.items[0].id, 'test2');
-  t.equals(res.items[1].id, 'test3');
+  t.equals(res.items[0].id, 'B');
+  t.equals(res.items[1].id, 'C');
 
-  res = await Foo.query()
-    .usingRelation('mainbar', 'themainbar')
+  res = await Bag.query()
+    .usingRelation('smallSlot', 'itemA')
     .find();
 
   t.equals(res.items.length, 2);
-  t.equals(res.items[0].id, 'test1');
-  t.equals(res.items[1].id, 'test3');
+  t.equals(res.items[0].id, 'A');
+  t.equals(res.items[1].id, 'C');
 
-
-  res = await Foo.query()
-    .usingRelation('bars', 'bar1')
+  res = await Bag.query()
+    .usingRelation('largeSlot', 'item1')
     .find();
 
   t.equals(res.items.length, 3);
-  t.equals(res.items[0].id, 'test1');
-  t.equals(res.items[1].id, 'test2');
-  t.equals(res.items[2].id, 'test3');
-
+  t.equals(res.items[0].id, 'A');
+  t.equals(res.items[1].id, 'B');
+  t.equals(res.items[2].id, 'C');
 
   t.end();
 });

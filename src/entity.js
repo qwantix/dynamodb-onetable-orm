@@ -24,8 +24,29 @@ const {
   genId,
 } = require('./utils');
 
+const MAX_TRANSAC_WRITE = 25;
 
 class Entity extends Row {
+  constructor(data) {
+    super();
+    this.constructor.setup();
+    this._$kt = this.$table.formatKey({
+      entity: this.$prefix,
+    });
+    this._$id = null;
+    this._state = new State();
+    this._state.initEntity(this);
+    this._relations = [];
+    this._pendingRelationsKeys = [];
+    this._versions = [];
+    this._v = 0;
+
+    this._writes = [];
+
+    this.setData(data);
+    this.resetWrites();
+  }
+
   /**
    * Entity name
    *
@@ -39,7 +60,7 @@ class Entity extends Row {
    * Returns a new entity ID
    */
   static $generateID() {
-    return `${this.$prefix}${this.$table.id}${genId()}`;
+    return `${this.$prefix}${genId()}`;
   }
 
   /**
@@ -138,6 +159,7 @@ class Entity extends Row {
         const v = Items[i];
         const $kt = v.$kt.S;
         const $ktInfo = this.$table.parseKey($kt);
+
         // If is the item
         if ($kt === this.$prefix) {
           const sch = this.prototype[DynamoDbSchema];
@@ -154,21 +176,17 @@ class Entity extends Row {
           if (Cls.prototype instanceof Relation) {
             const r = unmarshallItem(Cls.prototype[DynamoDbSchema], v, Cls);
             r.$name = name;
-            relations.push(
-              {
-                name, item: r, row: r, $kt,
-              },
-            );
+            relations.push({
+              name, item: r, row: r, $kt,
+            });
           } else {
             const row = unmarshallItem(Relation.prototype[DynamoDbSchema], v, Relation);
             const { relation } = this.$table.parseKey(row.$kt);
             const r = new Cls(relation);
             r.$name = name;
-            relations.push(
-              {
-                name, item: r, row, $kt,
-              },
-            );
+            relations.push({
+              name, item: r, row, $kt,
+            });
           }
         // If version
         } else if ($ktInfo.version && !$ktInfo.index && !$ktInfo.relation) {
@@ -214,7 +232,6 @@ class Entity extends Row {
     return item;
   }
 
-
   static async delete(id) {
     this.setup();
 
@@ -247,8 +264,8 @@ class Entity extends Row {
    * Create new query
    * @returns Query
    */
-  static query() {
-    const q = new Query();
+  static query(fn) {
+    const q = new Query(fn);
     q._entity = this;
     return q;
   }
@@ -305,26 +322,6 @@ class Entity extends Row {
     return this.constructor.$prefix;
   }
 
-  constructor(data) {
-    super();
-    this.constructor.setup();
-    this._$kt = this.$table.formatKey({
-      entity: this.$prefix,
-    });
-    this._$id = null;
-    this._state = new State();
-    this._state.initEntity(this);
-    this._relations = [];
-    this._pendingRelationsKeys = [];
-    this._versions = [];
-    this._v = 0;
-
-    this._writes = [];
-
-    this.setData(data);
-    this.resetWrites();
-  }
-
   set $id(value) {
     this._$id = this.constructor.ensurePrefix(value);
   }
@@ -373,6 +370,16 @@ class Entity extends Row {
           }
         });
     }
+  }
+
+  async update(body = {}) {
+    Object.keys(body).forEach((k) => {
+      if ((this.constructor.$schema[k] || this.constructor.$relations[k]) && body[k] !== undefined) {
+        this[k] = body[k];
+      }
+    });
+
+    return this.save();
   }
 
   async save() {
@@ -587,6 +594,7 @@ class Entity extends Row {
         this._writes.push(['put', rel]);
       }
     }
+
     relToDelete.forEach(($kt) => {
       const rel = new Relation();
       rel.$id = this.$id;
@@ -604,8 +612,11 @@ class Entity extends Row {
       return 0;
     }
     this.resetWrites();
-    // console.log('WRITES', writes);
-    await this.$table.batchWrite(writes);
+    if (writes.length <= MAX_TRANSAC_WRITE) {
+      await this.$table.transactWriteItems(writes);
+    } else {
+      await this.$table.batchWrite(writes);
+    }
     writes.forEach((w) => {
       const [action, item] = w;
       if (action !== 'put') {
@@ -653,6 +664,5 @@ class Entity extends Row {
     };
   }
 }
-
 
 module.exports = Entity;

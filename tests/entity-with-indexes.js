@@ -43,7 +43,7 @@ test('Create entity with index', async (t) => {
   obj.bar2 = 'mybar2';
   const writes = await obj.save();
   t.equals(writes, 3, 'Numbers of writes should be equals to 3');
-  await validateRows([
+  await validateRows(t, [
     {
       bar1: {
         S: 'mybar1',
@@ -102,6 +102,14 @@ test('Create entity with index', async (t) => {
   t.end();
 });
 
+test('find all', async (t) => {
+  await clear();
+  await Promise.all([{ bar1: 'FancyBag' }, { bar1: 'DoggyBag' }].map(b => new Foo(b).save()));
+  const res = await Foo.query()
+    .find();
+  t.equals(res.items.length, 2);
+  t.end();
+});
 
 test('Get entity with index', async (t) => {
   await clear();
@@ -112,7 +120,7 @@ test('Get entity with index', async (t) => {
   t.equals(writes, 3, 'Numbers of writes should be equals to 3');
   // Get
   const obj1 = await Foo.get('test');
-  validateObj(obj1, {
+  validateObj(t, obj1, {
     id: 'test',
     bar1: 'mybar1',
   });
@@ -129,14 +137,14 @@ test('Update entity with index', async (t) => {
   t.equals(writes, 3, 'Numbers of writes should be equals to 3');
   // Get
   const obj1 = await Foo.get('test');
-  validateObj(obj1, {
+  validateObj(t, obj1, {
     id: 'test',
     bar1: 'mybar1',
   });
   obj1.bar2 = 'bar2';
   writes = await obj1.save();
   t.equals(writes, 2, 'Numbers of writes should be equals to 2');
-  await validateRows([{
+  await validateRows(t, [{
     bar1: {
       S: 'mybar1',
     },
@@ -238,6 +246,6 @@ test('Delete entity', async (t) => {
   });
   await obj.save();
   await obj.delete();
-  await validateRows([], 'Invalid deletion');
+  await validateRows(t, [], 'Invalid deletion');
   t.end();
 });

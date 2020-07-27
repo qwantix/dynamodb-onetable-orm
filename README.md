@@ -243,7 +243,7 @@ class MyModel extends Entity {
         versioned: true,
       },
       bar: { // This field will be ignored
-        type: 'Numeric'
+        type: 'Number',
       }
     };
   }

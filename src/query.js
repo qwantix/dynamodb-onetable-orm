@@ -1,12 +1,10 @@
 /* eslint-disable no-await-in-loop */
-
 const crypto = require('crypto');
 
 const {
   AttributePath,
 } = require('@aws/dynamodb-expressions');
 const filters = require('./filters');
-
 
 /**
  * Returns 32 bytes key
@@ -16,6 +14,7 @@ function asValidEncryptionKey(encryptionKey) {
   Buffer.from(String(encryptionKey) || '').copy(b, 0, 0, 32);
   return b;
 }
+
 function encodeContinuationToken(lastKey, encryptionKey) {
   if (!lastKey) {
     return null;
@@ -51,7 +50,6 @@ function decodeContinuationToken(token, encryptionKey) {
     return null;
   }
 }
-
 
 function updateFilterWithPrefix(filter, prefix, depth = 10) {
   const out = { ...filter };
@@ -136,7 +134,7 @@ function replaceSpecialFilters(filter, entity, index, depth = 10) {
 }
 
 class Query {
-  constructor() {
+  constructor(fn) {
     this._entity = null;
     this._scanIndexForward = true;
     this._limit = 100;
@@ -148,6 +146,17 @@ class Query {
     this._projection = ['$id', '$kt'];
     this._continuationToken = null;
     this._using = { type: null };
+
+    if (typeof fn === 'function') {
+      const customFilters = fn(filters);
+      if (customFilters) {
+        if (Array.isArray(customFilters)) {
+          this._filters = customFilters;
+        } else {
+          this._filters = [customFilters];
+        }
+      }
+    }
   }
 
   clone() {
@@ -171,6 +180,10 @@ class Query {
    * @returns {Query}
    */
   usingIndex(name) {
+    if (name === undefined) {
+      return this;
+    }
+
     this._using = {
       type: 'index',
       name,
@@ -295,11 +308,10 @@ class Query {
    * Add filter
    * @param {string} filter
    */
-  addFilter(filter) {
-    this._filters.push(filter);
+  addFilter(...filter) {
+    this._filters = [...this._filters, ...filter];
     return this;
   }
-
 
   /**
    * Set continuation token returned by query
@@ -357,7 +369,6 @@ class Query {
       default:
     }
 
-
     if (skCondition) {
       // Sort key condition? add it
       keyCondition.$sk = skCondition;
@@ -365,10 +376,11 @@ class Query {
 
     let filter = null;
     if (filtersList && filtersList.length) {
-      if (filtersList.length > 1) {
-        filter = filters.and(...filtersList);
+      const clearedFilters = filtersList.filter((f) => f !== undefined);
+      if (clearedFilters.length > 1) {
+        filter = filters.and(...clearedFilters);
       } else {
-        filter = filtersList[0];
+        filter = clearedFilters[0];
       }
     }
 
@@ -466,6 +478,5 @@ class Query {
     return count;
   }
 }
-
 
 module.exports = Query;

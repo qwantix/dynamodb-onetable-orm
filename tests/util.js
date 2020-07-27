@@ -9,6 +9,8 @@ const equal = require('fast-deep-equal');
 const Table = require('../src/table');
 const Entity = require('../src/entity');
 
+const { clearCache } = require('../src/entity-index');
+
 const TABLE = 'doto';
 const REGION = 'eu-west-1';
 
@@ -20,8 +22,8 @@ Table.setDefault(TABLE, {
 
 const table = Table.default;
 
-async function clear() {
-  const { Items } = await table.client.scan({
+async function scan() {
+  return table.client.scan({
     TableName: TABLE,
     ProjectionExpression: '#id,#kt',
     ExpressionAttributeNames: {
@@ -29,7 +31,12 @@ async function clear() {
       '#kt': '$kt',
     },
   }).promise();
-  await table.batchDelete(Items.map(item => ({
+}
+
+async function clear() {
+  clearCache();
+  const { Items } = await scan();
+  return table.batchDelete(Items.map(item => ({
     [DynamoDbTable]: table.name,
     [DynamoDbSchema]: {
       $id: {
@@ -46,29 +53,32 @@ async function clear() {
   })));
 }
 
-async function validateRows(expected, message) {
+async function validateRows(assert, expected, message) {
   const { Items } = await table.client.scan({
     TableName: TABLE,
   }).promise();
   if (!equal(Items, expected)) {
-    console.log('Rows should be: ', JSON.stringify(Items, null, 2));
-    throw new Error(message || 'Not equals to expected');
+    assert.fail(message || 'Not equals to expected');
+  } else {
+    assert.pass('Rows valid');
   }
 }
 
-async function validateObj(item, expected, message) {
+async function validateObj(assert, item, expected, message) {
   if (item instanceof Entity) {
     item = item.toJSON();
   }
   if (!equal(item, expected)) {
-    throw new Error(message || 'Not equals to expected');
+    assert.fail(message || 'Not equals to expected');
+  } else {
+    assert.pass('Object valid');
   }
 }
-
 
 module.exports = {
   Table,
   clear,
   validateRows,
   validateObj,
+  scan,
 };
